@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html data-page-node-id="62vnGWezquW8DxGUoBEa50" lang="zh-CN">
+<head data-page-node-id="ii7XpgUdfVLR8qXb9IJQ86">
+<script data-page-node-id="6YBHboCzVgICq7MaLiodU3" src="/page/page_comm/inject.js"></script>
+<meta data-page-node-id="wq8E26XcZLLKUrzQD6SkNk" charset="UTF-8">
+<meta data-page-node-id="kDtvTdQxEtz0C8stCsNigC" content="width=device-width, initial-scale=1.0" name="viewport">
+<title data-page-node-id="a3ILMW5y1OWFDNfMK95F2r" data-pnid-children="uD7O9bmho5EbDs5GN8FsGA">每日四象限</title>
+<meta data-page-node-id="v4LWDxFqutidjkv4AsZXfh" content="#111827" name="theme-color">
+<link data-page-node-id="w0llckIxqE1wFZsppUwEMW" href="/manifest.webmanifest" rel="manifest">
+<link data-page-node-id="YGfBVUSfc7j1unikK89R2Z" href="/icon.svg" rel="icon" type="image/svg+xml">
+<link data-page-node-id="bgO0f0BTNY0Ua53oUC6Mw3" href="/styles.css" rel="stylesheet">
+</head>
+<body data-page-node-id="vkQjeXAQfaBu1WCPTiS9Lj">
+
+<div data-page-node-id="LAQvnDObSSMTM2yVEpyyQZ" id="authScreen">
+  <div data-page-node-id="ujbii9OGuOdt9fAhRm2BTu" class="auth-card">
+    <h1 data-page-node-id="g8Lm4aAudiGuVZ1AizGGM7"><!--pnid:35DNtkhkZn7WyjLAIQsjfj-->每日四象限</h1>
+    <p data-page-node-id="300glv7QnXHYIjerzNnrmB"><!--pnid:Ebarg5N7h34lFz9pJ1nSvT-->登录后在手机、平板、电脑上看到同一份任务表。每个账号的数据互相隔离。</p>
+    <div data-page-node-id="gnUXRmfbkrJZttLpVbVl7X" class="tabs">
+      <button data-page-node-id="8FKiTqmvKnqI6RGqsGGjL6" class="active" id="tabLogin"><!--pnid:QRYQnugzMs1XjuJZxyISzA-->登录</button>
+      <button data-page-node-id="FHShYSKXQMSSLGenmojKST" id="tabRegister"><!--pnid:97w5zVN4KVq5cPe9gATTRU-->注册</button>
+      <button data-page-node-id="bw3dddq78fXmE8BWGkoDIc" id="tabReset"><!--pnid:ZRqCudc56FZ32aAbLqwPSe-->找回密码</button>
+    </div>
+    <div data-page-node-id="4lHAZsWGhz92doJio7Dhxk" class="field">
+      <label data-page-node-id="VQWLxdlwuwisr6lgddKT9E" for="authUser"><!--pnid:DXCdXKuf6jiiSlipeYvnKR-->账号</label>
+      <input data-page-node-id="NvnxPKj0OuW9gCVzGOexKC" autocomplete="username" id="authUser" maxlength="32" type="text">
+      <div data-page-node-id="qaBQjCptdM6htiI5FHNrkN" class="saved-accounts" id="savedAccounts"></div>
+    </div>
+    <div data-page-node-id="R5XRFILwo0WSLrPC3Fr3rN" class="field" id="emailField">
+      <label data-page-node-id="RQdBgU46JNrBmQ2khIKRS0" for="authEmail"><!--pnid:juW78RpGWzuhvYJ0MrHpxB-->邮箱 <span data-page-node-id="k5Rf0UnHVcAWfOLprWJttm" class="hint" id="emailRequiredHint"></span></label>
+      <input data-page-node-id="zeMtlBovdi1nL9ua8u0qk9" autocomplete="email" id="authEmail" maxlength="120" placeholder="用来找回账号、接收验证码" type="email">
+    </div>
+    <div data-page-node-id="BLlxJJf7Jv4thM4iJmnj5B" class="field hidden" id="codeField">
+      <label data-page-node-id="tyRQmfpCnuS2KhjDBEHiZM" for="authCode"><!--pnid:nFRGibdWMty27ocFNXx8Uo-->邮箱验证码</label>
+      <div data-page-node-id="UbimHPetAAISHrVXRz8Y3s" class="code-row">
+        <input data-page-node-id="1toKz8vlVTrNQfMi1GAQRJ" autocomplete="one-time-code" id="authCode" inputmode="numeric" maxlength="6" placeholder="6 位数字" type="text">
+        <button data-page-node-id="IdqIbEqE8oGHsqRmvsesUA" class="btn small" id="sendCodeBtn" type="button"><!--pnid:139nVul2f7o0DK5Bix0acU-->发送验证码</button>
+      </div>
+    </div>
+    <div data-page-node-id="IHlgmF0nyPoDwMSpwfwhRI" class="field">
+      <label data-page-node-id="0t8Ehfe7mGDWnppbUEaAM8" for="authPass"><!--pnid:xCQrcK6bFv4eiDUfxRLCre-->密码</label>
+      <div data-page-node-id="PHcoA35SRtzoQJGHFSjX9Q" class="pass-row">
+        <input data-page-node-id="1zvlMHEiuofmhVxyqeP0Rj" autocomplete="current-password" id="authPass" maxlength="128" type="text">
+        <button data-page-node-id="PaohLslhj3pGkKZu40r80J" class="pass-eye" id="togglePass" type="button"><!--pnid:XQ8yqas9TBbo0KglGvb6vI-->隐藏</button>
+      </div>
+    </div>
+    <div data-page-node-id="oSdUaDtdpq2FwinYM3OoRV" class="error" id="authError"></div>
+    <div data-page-node-id="mvGmL0syfslO5LE6meIwkx" class="modal-actions">
+      <button data-page-node-id="GRjPAgjwPrL2zSNaZaCgaF" class="btn primary" id="authSubmit" style="width:100%"><!--pnid:5OAigXjSlN6dPYRYT0jExo-->登录</button>
+    </div>
+    <div data-page-node-id="kFNmrzv5UUQjflZLdbmTRf" class="auth-note" id="authNote"></div>
+  </div>
+</div>
+
+<div data-page-node-id="ebBIsUzsWpd4AYPf436njt" class="wrap hidden" id="appShell">
+  <header data-page-node-id="azOssP4lQVV4OPmvbnhKVy">
+    <div data-page-node-id="bvAsHhOy7YfvBYLzBmzSXS" class="brand">
+      <div data-page-node-id="AlQlJh2Xo9YlN7lrSvIpnl" class="brand-mark"><i data-page-node-id="KKPKmzsdujbo6TLJ2R9XJA"></i><i data-page-node-id="S6RQnsgf5aEsyzfx9mA5Xy"></i><i data-page-node-id="Z13LUsG9UI4Fh390HjtdKf"></i><i data-page-node-id="46HKt7Q7SSGRIiqlq4TD4J"></i></div>
+      <div data-page-node-id="8vUaCpf5mD67dxVgWSbhTj">
+        <h1 data-page-node-id="txLk3OqimpemEaErbLrSLh"><!--pnid:Nxppny3YiJIq072RHsH60L-->每日四象限</h1>
+        <div data-page-node-id="O2li5qlC2ev55hZtN88p7C" class="date" id="dateLine"></div>
+      </div>
+    </div>
+    <div data-page-node-id="2u8hIygfQyyswX1QXx4JZM" class="actions">
+      <button data-page-node-id="fb2zBKQov0Ctfgyh8Zxc7W" class="btn primary" id="addBtn"><!--pnid:K6jiNzUyHxjqDwT08D7zMh-->+ 新增任务</button>
+      <button data-page-node-id="gVx0Jta41mJy6vc45nQF8K" class="btn" id="reviewBtn"><!--pnid:OuiNb2I43tH5aJw6idtHOd-->今日回顾</button>
+      <button data-page-node-id="FoGKINN0iwPJdGyPlGzzV0" class="btn ghost" id="refreshBtn"><!--pnid:RjH0TTkmTgmKwtSXzyIORk-->重算提醒</button>
+      <button data-page-node-id="iw9G6EkxeyhDRJkXae7euu" class="btn ghost" id="exportBtn"><!--pnid:2W4SaPJhQwqmUp13D5inmm-->导出</button>
+      <button data-page-node-id="hvRBQ2FBkWKWsmbNChPH7w" class="btn ghost" id="importBtn"><!--pnid:fLqlahyuZv7MxtmOWgWGvn-->导入</button>
+      <button data-page-node-id="FGSg1FNIofq4bo0qAqiiJc" class="btn ghost" id="logoutBtn"><!--pnid:H8PgV3GezXGKdlnsAXaRrb-->退出 <span data-page-node-id="k9dPTpgtdrmHsPo01CXd0H" id="whoAmI"></span></button>
+      <input data-page-node-id="Ltt1WQPo4Qylg58LZhVG99" accept="application/json" hidden id="importFile" type="file">
+    </div>
+  </header>
+
+  <section data-page-node-id="H8fARzgmQgIYyyPn42Tsdq" class="guide" id="guide">
+    <div data-page-node-id="IDCEZU0jeGu1beX3b8JLz8" class="guide-head" id="guideHead">
+      <h2 data-page-node-id="0WREkm9zfkH2UOH3t8Mii3"><!--pnid:9Lx3wB6pg3DoHqrCNxggeA-->30 秒上手 <span data-page-node-id="1W5vRRtNW9PFXqeHCVWpxu" class="hint"><!--pnid:os5NGp71GA1Xl8FThayp5W-->每天就这四步</span></h2>
+      <span data-page-node-id="Fm48m8A1woFSEF290QlPCd" class="guide-chevron"><!--pnid:ng1AzL1o7AyHDUKfPR3u6r-->▼</span>
+    </div>
+    <div data-page-node-id="7Y8tDlXELV5RXj14sPMpxA" class="guide-body">
+      <div data-page-node-id="BIJsS7Bb9nE60WssdXepP0" class="guide-steps">
+        <div data-page-node-id="KWevP0m8M4NJfJbKOQN0ek" class="guide-step">
+          <div data-page-node-id="y6c0G4Q1pKyYdyzoQCvbKJ" class="guide-num"><!--pnid:W4oDd4Mh7GL3xSbXhkK3Qb-->1</div>
+          <b data-page-node-id="Mckp7MmHQyNvDrC6UNIv0j"><!--pnid:OZtv8kAaCLV0miOtlA4esF-->想到就说</b>
+          <p data-page-node-id="IJVkxFKxvIQZgNqJ1Iqsye"><!--pnid:CnUYbPSg73DmeiVv6O7mBG-->点「新增任务」，像发消息一样说出来：「下周三前交方案」。日期你自己会认。</p>
+        </div>
+        <div data-page-node-id="636dRMXZ2HctgW7D5peUzF" class="guide-step">
+          <div data-page-node-id="mFhMcXllTNBUsmulbUBptv" class="guide-num"><!--pnid:tu3Arh9b8ge7pCDaxlXfm2-->2</div>
+          <b data-page-node-id="hwvqxzAFVVfwQCU0kpD3Fk"><!--pnid:iOhHT4nhSTt82O2YwzVMxA-->答两个问题</b>
+          <p data-page-node-id="laiGev4Yz8PgglOjFAKgna"><!--pnid:uStytnPbz5xrMwcehIG5XE-->「不做会怎样」「催得急吗」。凭感觉选，系统自己决定轻重。</p>
+        </div>
+        <div data-page-node-id="KVxBKSmgAlk6p2l6S8R06Q" class="guide-step">
+          <div data-page-node-id="JlGL1nI6N4efPsjxIslycL" class="guide-num"><!--pnid:8BZqyksgMx9OBW5pOsXARt-->3</div>
+          <b data-page-node-id="EGvZYCQm1SkDWTQR1F4K6O"><!--pnid:5AevtQUMRNRX8yBLWKZK93-->只看三件</b>
+          <p data-page-node-id="KihEix1OGq5kmneqyz6sko"><!--pnid:FNA7JKQyGVNJAfnfNkY4UB-->首页「今天，就这三件」是今天该做的。其余的放下面，不用纠结。</p>
+        </div>
+        <div data-page-node-id="jnSQXgQ0qF84QBKLm7TV48" class="guide-step">
+          <div data-page-node-id="BmJaxOqvj696l5iKbwTKlf" class="guide-num"><!--pnid:iFcNSYL1rvpv6i5Z9lWzQ8-->4</div>
+          <b data-page-node-id="9vXXBRqLWxubRvRPzdMX9k"><!--pnid:SZb4tQ2POAI0PD7kqQkSHz-->开提醒</b>
+          <p data-page-node-id="EAmVxP9Kwp2p1nedJppEOJ"><!--pnid:uyMoIrjzFljGVxkLyKA6fO-->配好微信提醒，临近截止主动推给你。没打开网站也能收到。</p>
+        </div>
+      </div>
+      <div data-page-node-id="Fd5gOh55pGN6PxWguLj14P" class="guide-foot"><!--pnid:YG9SZhUZulucyC41NpB99d-->点标题可折叠。所有数据按账号存在服务端，换设备登录同一账号即可同步。</div>
+    </div>
+  </section>
+
+  <div data-page-node-id="B5TuOXbBqfrEby5Zxq0mtt" class="notice"><!--pnid:caGhYJpbOIMBNcVQg8FQ8k-->主动提醒两种渠道：微信提醒（推荐，手机必达）需在下方配置 pushplus token；浏览器推送点「开启主动提醒」授权，iOS 需先添加到主屏幕，国内安卓浏览器常收不到。重要数据请用「导出」留备份。</div>
+
+  <section data-page-node-id="781QrDA0CN2b8CN2smURhA" class="panel focus" id="focusPanel">
+    <div data-page-node-id="kNfT2UhUJNzes5F5X9Ugfr" class="panel-title"><h2 data-page-node-id="ym8rFSv4cT6pfkAIr0MK1m"><!--pnid:kBkm8KqvrmSIsF2gNHSQbL-->今天，就这三件</h2><span data-page-node-id="NBwyH2Symi0Uf7DTv78XDO" class="hint" id="focusHint"></span></div>
+    <div data-page-node-id="QpYSFGZxsJJrMdlBdqxO9X" id="focusList"></div>
+  </section>
+
+  <section data-page-node-id="E83Rt0HG9WSDuFl0cQTitG" class="panel reminders">
+    <div data-page-node-id="eBjwgqH81IQckQSfSYWQWc" class="panel-title">
+      <h2 data-page-node-id="2j9Ul57HEp7JCGDStu5BdS"><!--pnid:hlcrxgoCf1l5vc4h2lkb5C-->今日提醒 <span data-page-node-id="fNqhy4Vxi2JfMvr74I8Kx6" class="hint" id="reminderCount"></span></h2>
+      <span data-page-node-id="nr3S1KdfPhVA2Cqcu6OP5X" class="push-bar">
+        <span data-page-node-id="InOWfqo2vXWAoBUJe0t68K" class="save-state" id="saveState"></span>
+        <button data-page-node-id="1ZkgCxEYyHXP8igoMRxhD7" class="btn small" id="pushEnableBtn"><!--pnid:ljMV6jSiZcQxzKysZqX8Rd-->开启主动提醒</button>
+        <button data-page-node-id="yao57tPb51qlOHNxtnSt74" class="btn small ghost" id="pushTestBtn"><!--pnid:tI05cFY8IP49qDTlQx94DG-->测试推送</button>
+        <span data-page-node-id="PNOFtRPXdJx0eo6iIIvAYE" class="save-state" id="pushStatus"></span>
+      </span>
+    </div>
+    <div data-page-node-id="gjJ2Zy5G2gRldkQg7MIFlY" class="reminder-list" id="reminderList"></div>
+  </section>
+
+  <section data-page-node-id="pW9FIwyWXk86KPUwzZ8HbF" class="panel wechat-panel">
+    <div data-page-node-id="9Gr3SLsB0poxuhivLyYSOk" class="panel-title"><h2 data-page-node-id="D5TsTm38YA7GrfnrflpKb4"><!--pnid:funxDTFzFNVkCAhBO4Tb38-->微信提醒 <span data-page-node-id="Kh9VZxOs55g78KANalVbro" class="hint" id="wechatState"></span></h2></div>
+    <p data-page-node-id="L7uj6ylLJyeO9XNb15Y8kH" class="desc"><!--pnid:w0Q3K6mId9RqOrJr5HUmlt-->微信扫码登录 pushplus，在「一对一推送」页面复制 token，粘贴到下面。token 只存在服务端，不会回显。免费版每天 200 条，足够个人用。</p>
+    <div data-page-node-id="nEzg4KAaawcOlNUFMlV0Fo" class="wechat-row">
+      <input data-page-node-id="aLxCE6PUT14PzqTSZ8SkFw" autocomplete="off" id="wxToken" maxlength="200" placeholder="粘贴 pushplus token" type="password">
+      <select data-page-node-id="QfbXoLgOowPuUGr1yMEcwx" id="wxChannel">
+        <option data-page-node-id="T2fVJJCyod5ElxJOD8rMcU" value="wechat"><!--pnid:0kxW58CpobW8c881HfOvpz-->微信公众号</option>
+        <option data-page-node-id="Q3vNvOsEpNarZoAdYaozfR" value="clawbot"><!--pnid:W4vOlKkPo2lIzQEisNjYEL-->微信 ClawBot</option>
+        <option data-page-node-id="lWTosHTMKYgA3xWMVhpSg0" value="app"><!--pnid:0i7XN7QxZBopcD9lhs0SPi-->PushPlus App</option>
+        <option data-page-node-id="vU1gCCYpdw84DmhLKjck7j" value="mail"><!--pnid:ItKxyd7S4lR58d6TqdfwZz-->邮件</option>
+      </select>
+      <button data-page-node-id="2GdPcXmloWav7gffCsamRT" class="btn" id="wxSave"><!--pnid:nhxUo996C9uikGqsB0pZCE-->保存</button>
+      <button data-page-node-id="WGj3YSJQN4HsuF3bD09n7I" class="btn small" id="wxTest"><!--pnid:HUcOze4Hwv96mG9kQG4y9d-->发送测试</button>
+    </div>
+    <div data-page-node-id="fDcp2nud6zXdIMBXaE1n47" class="error" id="wxError"></div>
+  </section>
+
+  <section data-page-node-id="qydXUTM5JivMiG0RG1TfRo" class="panel admin-panel hidden" id="adminPanel">
+    <div data-page-node-id="DWr0lcJ0cP7CZQwmulADCi" class="panel-title"><h2 data-page-node-id="8mNAzcqI6O8s3jTrTcubRY"><!--pnid:tGl45bVLSfBpiZg2yv4j1y-->站点设置 <span data-page-node-id="Zw1hbEErwQOcW60TNo2VKM" class="hint"><!--pnid:i0NMjxj3caKMdaDs023WkO-->仅管理员可见</span></h2><span data-page-node-id="gftOgoxjkaKAuxPZrGji8c" class="save-state" id="smtpState"></span></div>
+    <p data-page-node-id="Ys0HQh7KdiCf7mbn7dxX1p" class="desc"><!--pnid:3yDsyHeXSTFNO0wmapsFg3-->配置发信邮箱后，新用户注册必须验证邮箱，能挡住批量乱注册。推荐用 QQ 邮箱或 163 邮箱的 SMTP 授权码（不是登录密码）。授权码只存服务端，不回显。</p>
+    <div data-page-node-id="Fv5hoVgXAmbaR7delvZCiz" class="smtp-grid">
+      <input data-page-node-id="BauJPSzV6i4NILgeWPyVXL" id="smtpHost" placeholder="SMTP 地址，如 smtp.qq.com" type="text">
+      <input data-page-node-id="wGBxapLZhrfuQQXqPCYxEQ" id="smtpPort" placeholder="端口 465 或 587" type="text" value="465">
+      <input data-page-node-id="HERNyzga9WB8QpRhi8bu2q" id="smtpUser" placeholder="发信邮箱，如 xxx@qq.com" type="text">
+      <input data-page-node-id="jfu9yzXl0qGbFbDh2TcAKr" autocomplete="off" id="smtpPass" placeholder="SMTP 授权码" type="password">
+      <input data-page-node-id="T8Huajf5JycP6uonU6Z1Ri" id="smtpSender" placeholder="发件人名称（可选）" type="text">
+    </div>
+    <div data-page-node-id="7qAxI7eqEJM7xVfaBfOAsB" class="error" id="smtpError"></div>
+    <div data-page-node-id="67Kj263l9VuDtY96fG9hBR" class="modal-actions">
+      <button data-page-node-id="wLxDBxLqwIXs5GlYPDoqbk" class="btn primary" id="smtpSave"><!--pnid:Meh8NdmxZWNtm2R91ZsenK-->保存并发送测试邮件</button>
+      <button data-page-node-id="ADT8XBP5xU2ZPS14qoVUPf" class="btn small" id="smtpTest"><!--pnid:9LCcNsAejMw8amgaocOhMJ-->再发一次测试</button>
+    </div>
+  </section>
+
+  <div data-page-node-id="E9Y3NHo93RwuZYC57zxd10" class="matrix-head"><h2 data-page-node-id="YM6tQGYxLfOKsQNOqwsaH5"><!--pnid:TXY9TNSpKPV91S52s1gwab-->其余的事</h2><span data-page-node-id="EZMrq9yUISwz94X7JGPwQz" class="hint"><!--pnid:WyE2c65itQ18gUZE0txHmY-->放这里不代表马上要做，需要时再看</span></div>
+  <main data-page-node-id="zHyg8jBTStNbdpBfolmRQG" class="matrix" id="matrix"></main>
+
+  <div data-page-node-id="EsL3AGzmm9dZmKx2im2rot" class="bottom">
+    <section data-page-node-id="d5R0D9JvfqliBks9fGKtSO" class="panel done-list">
+      <div data-page-node-id="u3eGU1V6nk2x461DFrZyLu" class="panel-title"><h2 data-page-node-id="DanOkYGcIXjEp5VyhdtIXC"><!--pnid:hEyw1pKW6FxwXMWOQvGAW8-->今日已完成</h2><span data-page-node-id="7rXcVSi6bf6aY5bPkAjXhg" class="hint" id="doneCount"></span></div>
+      <div data-page-node-id="8h32mlsmodXWJdfoeDsqye" id="doneList"></div>
+    </section>
+    <section data-page-node-id="Q80HlHRfNCkBzQBuSEP0HJ" class="panel rules">
+      <div data-page-node-id="IyKlgdITGqK8Yv6wufgD3Y" class="panel-title"><h2 data-page-node-id="4vrtIv8s3zBo14G1prRr9P"><!--pnid:tIS7McunpH1oLg2SFDjcye-->智能增补规则</h2><span data-page-node-id="xvt76LLEEI52oGIbng1Hwa" class="hint"><!--pnid:BmgCAtL3P4yFRPyR4CFY3x-->每天打开自动执行</span></div>
+      <ol data-page-node-id="MqRn9CI3W0oecFoGyE0MOh">
+        <li data-page-node-id="1nciapzMpQIDCUhXzHymPs"><!--pnid:xkiry641rzJTpIP3yXrJBf-->未完成的任务自动顺延到当天，并累计顺延次数。</li>
+        <li data-page-node-id="hhk5jOyztxI69XQ1OBJAB5"><!--pnid:LGYsnwv3Ggm7FRO8TMICgp-->逾期的任务自动跳到「今天，就这三件」最前面，防止继续拖。</li>
+        <li data-page-node-id="ZVmp2o6OWTemV1Zit4XRfa"><!--pnid:1gSnDya6fIkuBhYMPQWkEt-->顺延 3 次以上的任务，提醒你拆小一点，或者直接删掉。</li>
+        <li data-page-node-id="boxPNpTQKAhD9f3HYnoB0Y"><!--pnid:YQkDIxj7jvfxSr47oUrSza-->2 天内截止、又会出大事的任务，提前推给你。</li>
+        <li data-page-node-id="L9PXxsYJQso9horoe8SoTs"><!--pnid:9blhUJUwmA1F1qnjFEoBOP-->下次打开时逐条追问上次没做完的事，当场更新状态。</li>
+      </ol>
+    </section>
+  </div>
+
+  <footer data-page-node-id="ags4NoyV44wvU0qjjSHdmt"><!--pnid:HaTKM5NVGb8PvEMkE6A4L6-->每天只盯三件事。说不出来的，先说给系统听。</footer>
+</div>
+
+<div data-page-node-id="zII0ElgVg9NAnpurXI1fGr" class="mask" id="addMask">
+  <div data-page-node-id="VnH6ZQ6W0ir4oznWYWBcGc" class="modal wizard">
+    <div data-page-node-id="VDVbSQCbtDKe1l2UdUWC2J" class="wizard-progress"><span data-page-node-id="ARVOXYXGMNRd5oRRqXzD97" class="active" id="wzDot1"><!--pnid:AZByxjesv5pw7jJvQopLPE-->1</span><span data-page-node-id="Rkj4u2Zlwbh4jeoCONBjdJ" class="line"></span><span data-page-node-id="43RB4oRKSaSxIzfnKHDvzA" id="wzDot2"><!--pnid:ahgWRl2PdvdYTpb3wb9HQi-->2</span><span data-page-node-id="ukK6ZWoXmmVVMPjyZa7n8K" class="line"></span><span data-page-node-id="GfmYZTticIAUUxT3IqdJ4k" id="wzDot3"><!--pnid:7csZ3iwYrlimiUXxMCMJjw-->3</span></div>
+
+    <div data-page-node-id="xA3ZqXTrSu9hZZHu9myD3l" class="wizard-page" id="wzPage1">
+      <h3 data-page-node-id="8UTfaK6AtdBVnpLWG9qfq2"><!--pnid:VXM48MYznadKWYEuAUtHmi-->想到了什么，直接说</h3>
+      <p data-page-node-id="KJTC0Rl2awbsIuH2LdOODI" class="desc"><!--pnid:0mMexY20um4k1MYO29IVQm-->不用想格式，也不用管什么象限。像发消息一样说出来就行。</p>
+      <div data-page-node-id="1fhPOVzQR2yfr7GDHZKPLY" class="field">
+        <input data-page-node-id="Bx9To2Y71wTRwDF5mBQhrh" autocomplete="off" id="wzInput" maxlength="160" placeholder="比如：下周三前把方案发给老板" type="text">
+      </div>
+      <div data-page-node-id="LKklrisCO6D3povkuaTxCc" class="suggestions">
+        <span data-page-node-id="1tqL0XYYewn1HE6csCrKLN"><!--pnid:kZLzKGU1JHYiqwd24fGplD-->不知道怎么开口？点一个改改：</span>
+        <button data-page-node-id="ec89y6iiI8w073JCej6OxJ" class="chip" data-sample="明天下午三点前交房租"><!--pnid:ZVSrc7I6RD46bA7s0jBZHt-->明天下午三点前交房租</button>
+        <button data-page-node-id="y9WfRwliLRZF0YXjVgsegS" class="chip" data-sample="这周内约牙医"><!--pnid:fGV136ZkgMq4D5ejnsiMRg-->这周内约牙医</button>
+        <button data-page-node-id="6udgFv6Aw64cCjUJd6UYlw" class="chip" data-sample="下周一把简历投出去"><!--pnid:ayX2tda3EVrj6QBfjUJ6r0-->下周一把简历投出去</button>
+      </div>
+      <div data-page-node-id="In2nuXFJLVoOPwNxM4s1G7" class="error" id="wzError1"></div>
+      <div data-page-node-id="nFCvpvf1bFU1y4Rk76EGbl" class="modal-actions"><button data-page-node-id="cqDkPtRBfoHhBQASG3FMPD" class="btn" id="wzCancel1"><!--pnid:HF4eCj7FPKubJ5rNo3Lq7n-->取消</button><button data-page-node-id="SIoHtUSdPFRvM1GvVXjRWU" class="btn primary" id="wzNext1"><!--pnid:UBpneZt1C2dTjbCOduhv5w-->继续 →</button></div>
+    </div>
+
+    <div data-page-node-id="7jPxEg3PTkBhp4I8FImJLs" class="wizard-page hidden" id="wzPage2">
+      <h3 data-page-node-id="t5Z80d9WF0SRYSMTtGXOvx"><!--pnid:ryD1PjT78XE1XiLcbZyC6H-->我说说理解得对不对</h3>
+      <p data-page-node-id="qgXN3zY7sSbYP7AXsObN3u" class="desc"><!--pnid:V3dTXyl8NtOWObpc4c6Gtm-->你说的是这件事，时间是这个。哪里不对可以直接改。</p>
+      <div data-page-node-id="IrkiXBSUZqqTnGbZKIJaO0" class="understand-card">
+        <div data-page-node-id="Kw0jbNXy2Dhz4h7STN7nBT" class="field mini"><label data-page-node-id="r2mgb2UQEkmrUIb5unMoHV" for="wzTitle"><!--pnid:4uL9OjQcVfXQvTvVuN4Yh2-->要做的事</label><input data-page-node-id="WaSFaBDbniODZ0xyhxRXFm" id="wzTitle" maxlength="120" type="text"></div>
+        <div data-page-node-id="1MUFwEXsEEa9yvEaAKeih2" class="u-row"><span data-page-node-id="7uDsdlkjyjk1Cvm7mKI7ur" class="u-label"><!--pnid:zLVHHnRUZNCLm2C5kPbW5U-->什么时候</span><span data-page-node-id="LqvNpSqKPg2FXMW6B2eNjc" class="u-value" id="wzDatePreview"></span></div>
+        <div data-page-node-id="lXQ0rybNz4IAteoQYAjfUB" class="field inline"><label data-page-node-id="HSfmZeo6AbTSDe99wcDhjP" for="wzDate"><!--pnid:5WBFKDlMSp8vkpFWlGQM9d-->改日期</label><input data-page-node-id="sqVNPEmptoQ5FYsYp9zUQV" id="wzDate" type="date"></div>
+      </div>
+      <div data-page-node-id="Yx5uBFFXC91QPPM0F24nOZ" class="error" id="wzError2"></div>
+      <div data-page-node-id="AL8eztvUOp7EK2USeW17GL" class="modal-actions"><button data-page-node-id="KQtwjU727HrSUuEpu7FcXd" class="btn" id="wzBack2"><!--pnid:zOA5xq24XWtzG2ffrS3JYf-->返回</button><button data-page-node-id="OpmhpPirUW31rbdJ2JZl19" class="btn primary" id="wzNext2"><!--pnid:FVhn0TLkOIR46BB3ORd3o3-->继续 →</button></div>
+    </div>
+
+    <div data-page-node-id="yKtKLiRF91iHYezHqYPfJv" class="wizard-page hidden" id="wzPage3">
+      <h3 data-page-node-id="c5BQukyjiFM89NSrn53kCb"><!--pnid:jjy2bu5g79nsKBOnB6V5ni-->问你两个小问题</h3>
+      <p data-page-node-id="R9eV0gSUOOTh8SVLX5faGI" class="desc"><!--pnid:nJ7jXt51ciCFmWFaGQIzGy-->不用懂什么方法，凭感觉选就行。我只是想知道该把它放哪儿。</p>
+      <div data-page-node-id="2391E1Z7lhyoWTvAi9M05j" class="q-block">
+        <div data-page-node-id="E0rZmNZxBKxxKhgEObbZd9" class="q-text"><!--pnid:EARb6KgM4hNjWxl3u736Zy-->这事要是没做，会怎样？</div>
+        <div data-page-node-id="vmX6ESULSliZefCetCs6Yu" class="q-choices" id="qImpact">
+          <button data-page-node-id="LYj2mjLzATLlmTaEuM7mSX" data-v="3"><!--pnid:F6gtsNUjmPNMf0Ox6dNod5-->会出大问题</button>
+          <button data-page-node-id="ozfWUDdIlGTpOisaRVKdlP" class="sel" data-v="2"><!--pnid:ggK6fZpvl9dcLsOznmtCqb-->有点麻烦</button>
+          <button data-page-node-id="mbveIOWmwI0jwXFbCHxLaN" data-v="1"><!--pnid:3f7D14oV5qW2VLotkeJTJq-->其实无所谓</button>
+        </div>
+      </div>
+      <div data-page-node-id="Y2CbrAGdIfgIQCaUVd50ng" class="q-block">
+        <div data-page-node-id="PpVnuaK1Ixj6mWmsx3hOcs" class="q-text"><!--pnid:pxN1PTAgqVAQ0Rm2bscrZP-->它催得急吗？</div>
+        <div data-page-node-id="6plujHrmL81U3HAe7JBc6R" class="q-choices" id="qUrgency">
+          <button data-page-node-id="VqtwPc1SzCTXTvy5WEEdn0" data-v="3"><!--pnid:TDITOaCnE8Ucob4iVGexXC-->很急，马上要</button>
+          <button data-page-node-id="ZBI1l1LNuPlhdqY046q4gI" class="sel" data-v="2"><!--pnid:7TX2nGfMayo0b0Bx5eSQWq-->最近几天</button>
+          <button data-page-node-id="CA7DwQsBDdlwQLGb7KzdG5" data-v="1"><!--pnid:XfFzF35bUFT8wFwSMm7hKw-->不急，往后放</button>
+        </div>
+      </div>
+      <div data-page-node-id="gGVKZn7Ahm5fNZS5shP0oU" class="wizard-result" id="wzResult"></div>
+      <div data-page-node-id="zvpVcaVPFGshua5Zmzmzca" class="error" id="wzError3"></div>
+      <div data-page-node-id="zA5pmG61QhNgpmglU0jz7b" class="modal-actions"><button data-page-node-id="aovfs4kUsE931BeKUxxpQ1" class="btn" id="wzBack3"><!--pnid:AWvl4izvDAPfsj2muUNCRq-->返回</button><button data-page-node-id="1QVvAvLfZT2Uu1QC2CIyih" class="btn primary" id="wzSave"><!--pnid:OroAENpJt25QXXryHDVEJR-->记下来</button></div>
+    </div>
+  </div>
+</div>
+
+<div data-page-node-id="cwu6QyvRAO4HZahe0AuROe" class="mask" id="reviewMask">
+  <div data-page-node-id="bZu6k907xy1lsrUO5SCSRN" class="modal">
+    <h3 data-page-node-id="wVqHjxYMI7XMBRxMJCVjlO" id="reviewTitle"><!--pnid:6KVQtfkhhrmrcp3DXYOywm-->完成情况回顾</h3>
+    <p data-page-node-id="ZS7sur5AnELXEmjyKOuhoP" class="desc" id="reviewDesc"></p>
+    <div data-page-node-id="8eZi9VRboFz6OaGP7KNSJy" id="reviewItems"></div>
+    <div data-page-node-id="vVD5KpjukECoWBxXByzqOk" class="error" id="reviewError"></div>
+    <div data-page-node-id="QgP0Ohbgdxzj8Nsc8qfWcx" class="modal-actions">
+      <button data-page-node-id="rUNnnSpw6KrMUaWt6sAzRe" class="btn" id="reviewCancel"><!--pnid:lhvXZm3Gh1FzCnXE3MiSj5-->稍后再说</button>
+      <button data-page-node-id="4N3jTdMb41MSLwgJ1bkgBM" class="btn primary" id="reviewSave"><!--pnid:UUTsx6uhZteC9YfXcvw6E4-->保存回顾</button>
+    </div>
+  </div>
+</div>
+
+<script data-page-node-id="xZisnLYJdzHBhFVef0RIRk" src="/capture.js"></script>
+<script data-page-node-id="t72bR2hQVwBTGA7FWsTDhQ" src="/app.js"></script>
+</body>
+</html>
