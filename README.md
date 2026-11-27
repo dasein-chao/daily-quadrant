@@ -61,6 +61,7 @@ https://daily-quadrant-32717.app.workbuddy.host/?sharecode=SI4C4EK6BF
 | 主动提醒 | 浏览器推送 + 微信（PushPlus）；邮件不参与日常提醒 | 手机点「开启主动提醒」，等到点看是否弹通知 |
 | 提醒强度 | settings.reminder_mode，安静只入站内列表，强制用 `Urgency: high` | 切成安静后点「测试推送」，应只在列表里看到 |
 | 找回密码 | 6 位码存 SHA-256，10 分钟过期，一次性 | 点「找回密码」收码，用完再试应被拒 |
+| 注册防护 | 邮箱全局唯一；同一来源每小时最多 8 次注册 | 同一邮箱注册两次，应报「已绑过账号」 |
 
 **为什么 Web Push 发空 payload**：本来想用 `pywebpush`，它依赖 `http-ece`，当前环境没有可用的 wheel，装不上。改成自己签 VAPID、发空消息触发前端拉取。依赖从 3 个降到 0 个。
 

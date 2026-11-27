@@ -427,6 +427,29 @@ def get_reminder_mode(conn, user_id):
     return mode if mode in ('quiet', 'normal', 'force') else 'normal'
 
 
+# 注册限流：同一来源每小时最多 8 次。邮箱本身有唯一约束，这里防的是有人用脚本
+# 换着邮箱批量占位。反向代理后面取 X-Forwarded-For 的第一段。
+REG_LIMIT = 8
+REG_WINDOW = 3600
+_REG_LOCK = threading.Lock()
+_REG_HITS = {}
+
+
+def reg_allowed(ip):
+    now = time.time()
+    with _REG_LOCK:
+        hits = [t for t in _REG_HITS.get(ip, []) if now - t < REG_WINDOW]
+        if len(hits) >= REG_LIMIT:
+            _REG_HITS[ip] = hits
+            return False
+        hits.append(now)
+        _REG_HITS[ip] = hits
+        if len(_REG_HITS) > 500:
+            for k in [k for k, v in _REG_HITS.items() if not v or now - v[-1] > REG_WINDOW]:
+                _REG_HITS.pop(k, None)
+    return True
+
+
 def send_deadline_email(conn, user_id, title, body):
     # 已下线：邮件打开率太低，提醒改走浏览器推送和微信。
     # SMTP 配置保留，只服务「找回密码」验证码。
@@ -994,6 +1017,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return
 
             if path == '/api/register':
+                xff = self.headers.get('X-Forwarded-For', '')
+                ip = xff.split(',')[0].strip() if xff else self.client_address[0]
+                if not reg_allowed(ip):
+                    self._json(429, {'error': '这一小时注册得有点多，先歇一会儿。已经注册的直接登录就行'})
+                    return
                 username = str(body.get('username', '')).strip()
                 password = str(body.get('password', ''))
                 email = str(body.get('email', '')).strip().lower()
@@ -1010,7 +1038,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 # 注册不卡邮箱验证码：发信受额度、垃圾箱影响，卡在这里等于把人挡在门外。
                 # 邮箱只用于「找回密码」，发不出去也能正常注册。
                 if conn.execute('SELECT 1 FROM users WHERE email = ?', (email,)).fetchone():
-                    self._json(409, {'error': '这个邮箱已经注册过了，直接登录或用另一个邮箱'})
+                    self._json(409, {'error': '这个邮箱已经绑过账号了。如果那是你的邮箱，点「找回密码」，验证码会发到它，能把账号拿回来'})
                     return
                 if conn.execute('SELECT 1 FROM users WHERE username = ?', (username,)).fetchone():
                     self._json(409, {'error': '这个账号名被占了，换一个'})
