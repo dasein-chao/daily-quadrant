@@ -960,7 +960,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                    '/api/pushplus/config', '/api/pushplus/test',
                    '/api/email/send-code', '/api/admin/smtp', '/api/admin/smtp/test',
                    '/api/password/reset', '/api/email/notify', '/api/email/notify/test',
-                   '/api/reminder/mode')
+                   '/api/reminder/mode', '/api/admin/import-all')
         if path not in allowed:
             self._json(404, {'error': 'not found'})
             return
@@ -1097,6 +1097,48 @@ class Handler(http.server.BaseHTTPRequestHandler):
             user = session_user(self, conn)
             if not user:
                 self._json(401, {'error': '请先登录'})
+                return
+
+            if path == '/api/admin/import-all':
+                if not user['is_admin']:
+                    self._json(403, {'error': '只有管理员能导入'})
+                    return
+                if not body.get('confirm'):
+                    self._json(400, {'error': '导入会覆盖同账号的现有任务，确认后带 confirm: true 再发'})
+                    return
+                dump_users = body.get('users')
+                if not isinstance(dump_users, list) or not dump_users:
+                    self._json(400, {'error': 'users 必须是非空数组（/api/admin/export-all 的产物）'})
+                    return
+                created = updated = skipped = 0
+                with conn:
+                    for u in dump_users:
+                        uname = str(u.get('username') or '').strip()
+                        email = str(u.get('email') or '').strip().lower()
+                        st = u.get('state')
+                        if not uname or st is None:
+                            skipped += 1
+                            continue
+                        row = conn.execute('SELECT id FROM users WHERE username = ?', (uname,)).fetchone()
+                        if row:
+                            conn.execute(
+                                'INSERT INTO states (user_id, data) VALUES (?, ?) '
+                                'ON CONFLICT(user_id) DO UPDATE SET data = excluded.data',
+                                (row['id'], json.dumps(st, ensure_ascii=False)))
+                            updated += 1
+                        else:
+                            salt = secrets.token_bytes(16)
+                            tmp = secrets.token_urlsafe(18)
+                            cur = conn.execute(
+                                'INSERT INTO users (username, salt, pass_hash, email, is_admin) '
+                                'VALUES (?, ?, ?, ?, 0)',
+                                (uname, salt.hex(), hash_password(tmp, salt), email))
+                            conn.execute('INSERT INTO states (user_id, data) VALUES (?, ?)',
+                                         (cur.lastrowid, json.dumps(st, ensure_ascii=False)))
+                            created += 1
+                self._json(200, {'ok': True, 'created': created, 'updated': updated,
+                                 'skipped': skipped,
+                                 'note': '新建的账号密码是随机的，需本人用「找回密码」重设'})
                 return
 
             if path == '/api/admin/smtp':
