@@ -14,14 +14,19 @@ import socketserver
 import urllib.parse
 import urllib.request
 import smtplib
+import shutil
 import re
 from email.mime.text import MIMEText
 from email.utils import formataddr
 from contextlib import closing
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(ROOT, 'data.db')
-VAPID_PRIVATE_PATH = os.path.join(ROOT, 'vapid_private.pem')
+# 数据必须放在代码目录之外：每次部署会重写代码目录，放里面等于每次清库
+DATA_DIR = os.environ.get('DQ_DATA_DIR') or os.path.join(
+    os.path.expanduser('~'), '.daily-quadrant')
+os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = os.path.join(DATA_DIR, 'data.db')
+VAPID_PRIVATE_PATH = os.path.join(DATA_DIR, 'vapid_private.pem')
 PORT = int(os.environ.get('PORT', '3000'))
 COOKIE = 'dq_session'
 PBKDF2_ROUNDS = 200000
@@ -40,6 +45,54 @@ STATIC = {
     '/manifest.webmanifest': ('manifest.webmanifest', 'application/manifest+json; charset=utf-8'),
     '/icon.svg': ('icon.svg', 'image/svg+xml'),
 }
+
+
+def count_users(path):
+    try:
+        c = sqlite3.connect(path)
+        n = c.execute('SELECT COUNT(*) FROM users').fetchone()[0]
+        c.close()
+        return n
+    except Exception:
+        return -1
+
+
+def migrate_legacy_db():
+    """老版本把 data.db 放在代码目录里，部署会清掉。
+    启动时找旧库：只要旧库里的人比现用库多，就认定旧库才是真的，换回来。
+    换之前先把手上的库另存一份，不覆盖着丢。"""
+    legacy = os.path.join(ROOT, 'data.db')
+    if not os.path.exists(legacy):
+        return
+    old_n = count_users(legacy)
+    cur_n = count_users(DB_PATH) if os.path.exists(DB_PATH) else -1
+    if old_n > cur_n:
+        try:
+            if os.path.exists(DB_PATH):
+                shutil.copy2(DB_PATH, DB_PATH + '.before-recover')
+            shutil.copy2(legacy, DB_PATH)
+            print('recovered legacy db: %d users -> %d users' % (cur_n, old_n), flush=True)
+        except Exception:
+            pass
+
+
+def backup_db(pool=3):
+    """每天留一份副本，误删误覆盖还能捞回来。"""
+    if not os.path.exists(DB_PATH):
+        return
+    try:
+        stamp = datetime.date.today().isoformat()
+        dest = os.path.join(DATA_DIR, 'backup-' + stamp + '.db')
+        if not os.path.exists(dest):
+            shutil.copy2(DB_PATH, dest)
+        olds = sorted(
+            f for f in os.listdir(DATA_DIR)
+            if f.startswith('backup-') and f.endswith('.db')
+        )
+        for f in olds[:-pool]:
+            os.remove(os.path.join(DATA_DIR, f))
+    except Exception:
+        pass
 
 
 def connect():
@@ -97,8 +150,15 @@ def init_db():
                 user_id INTEGER PRIMARY KEY,
                 pushplus_token TEXT NOT NULL DEFAULT '',
                 pushplus_channel TEXT NOT NULL DEFAULT 'wechat',
+                email_notify INTEGER NOT NULL DEFAULT 1,
+                reminder_mode TEXT NOT NULL DEFAULT 'normal',
                 FOREIGN KEY(user_id) REFERENCES users(id)
             )''')
+            s_cols = {r['name'] for r in conn.execute('PRAGMA table_info(settings)').fetchall()}
+            if 'email_notify' not in s_cols:
+                conn.execute('ALTER TABLE settings ADD COLUMN email_notify INTEGER NOT NULL DEFAULT 1')
+            if 'reminder_mode' not in s_cols:
+                conn.execute("ALTER TABLE settings ADD COLUMN reminder_mode TEXT NOT NULL DEFAULT 'normal'")
             # 邮箱验证与管理员：对已有库做增量迁移，不丢旧数据
             cols = {r['name'] for r in conn.execute('PRAGMA table_info(users)').fetchall()}
             if 'email' not in cols:
@@ -122,9 +182,10 @@ def init_db():
             if 'purpose' not in code_cols:
                 conn.execute("ALTER TABLE email_codes ADD COLUMN purpose TEXT NOT NULL DEFAULT 'register'")
             conn.execute('CREATE INDEX IF NOT EXISTS idx_email_codes_email ON email_codes(email)')
-            # 开发期测试账号不得占据管理员位
+            # 开发期测试账号不得占据管理员位（含发布后验证持久化用的探针账号）
             test_names = ('live_test', 'tester_a', 'tester_b', 'pushuser', 'wxuser',
-                          'newui', 'checksuser', 'admin1', 'newuser', 'owner_check')
+                          'newui', 'checksuser', 'admin1', 'newuser', 'owner_check',
+                          'probe1', 'probe2', 'snaptest')
             for name in test_names:
                 conn.execute('UPDATE users SET is_admin = 0 WHERE username = ?', (name,))
             # 没有管理员时，把最早的真实账号提升，避免没人能配 SMTP
@@ -177,8 +238,10 @@ def send_email(cfg, to_addr, subject, body):
         raise ValueError('端口必须是数字')
     msg = MIMEText(body, 'plain', 'utf-8')
     msg['Subject'] = subject
-    sender = cfg['sender'] or cfg['user']
-    msg['From'] = formataddr(('每日四象限', sender))
+    # 发件地址必须是 ASCII 邮箱，中文只能放显示名
+    sender = cfg['user']
+    display = cfg['sender'] or '每日四象限'
+    msg['From'] = formataddr((display, sender))
     msg['To'] = to_addr
     if port == 465:
         client = smtplib.SMTP_SSL(cfg['host'], port, timeout=15)
@@ -328,6 +391,32 @@ def send_pushplus(conn, user_id, title, body):
         return False
 
 
+def get_email_notify(conn, user_id):
+    row = conn.execute('SELECT email_notify FROM settings WHERE user_id = ?', (user_id,)).fetchone()
+    return bool(row['email_notify']) if row else True
+
+
+def get_reminder_mode(conn, user_id):
+    row = conn.execute('SELECT reminder_mode FROM settings WHERE user_id = ?', (user_id,)).fetchone()
+    mode = row['reminder_mode'] if row else 'normal'
+    return mode if mode in ('quiet', 'normal', 'force') else 'normal'
+
+
+def send_deadline_email(conn, user_id, title, body):
+    cfg = smtp_config(conn)
+    if not smtp_ready(cfg) or not get_email_notify(conn, user_id):
+        return False
+    row = conn.execute('SELECT email FROM users WHERE id = ?', (user_id,)).fetchone()
+    if not row or not row['email']:
+        return False
+    try:
+        send_email(cfg, row['email'], title,
+                   body + '\n\n——来自「每日四象限」，可在网页里关闭邮件提醒。')
+        return True
+    except Exception:
+        return False
+
+
 def deliver_push(conn, user_id, title, body, task_id=None, kind=None, check_log=False, url='/'):
     if check_log:
         today = datetime.date.today().isoformat()
@@ -337,35 +426,40 @@ def deliver_push(conn, user_id, title, body, task_id=None, kind=None, check_log=
         ).fetchone()
         if exists:
             return 0
+    mode = get_reminder_mode(conn, user_id)
     delivered = 0
-    subs = conn.execute(
-        'SELECT endpoint FROM push_subscriptions WHERE user_id = ?', (user_id,)
-    ).fetchall()
-    for sub in subs:
-        endpoint = sub['endpoint']
-        if not VAPID_PUBLIC:
-            continue
-        try:
-            token = vapid_jwt(endpoint)
-            request = urllib.request.Request(
-                endpoint,
-                data=b'',
-                method='POST',
-                headers={
-                    'Authorization': 'vapid t=' + token + ', k=' + VAPID_PUBLIC,
-                    'Content-Type': 'application/octet-stream',
-                    'Content-Length': '0',
-                    'TTL': '86400',
-                }
-            )
-            with urllib.request.urlopen(request, timeout=10):
-                delivered += 1
-        except Exception:
-            pass
-    if delivered:
-        queue_message(conn, user_id, title, body, url)
-    wechat_ok = send_pushplus(conn, user_id, title, body)
-    total = delivered + (1 if wechat_ok else 0)
+    if mode != 'quiet':
+        subs = conn.execute(
+            'SELECT endpoint FROM push_subscriptions WHERE user_id = ?', (user_id,)
+        ).fetchall()
+        urgency = 'high' if mode == 'force' else 'low'
+        for sub in subs:
+            endpoint = sub['endpoint']
+            if not VAPID_PUBLIC:
+                continue
+            try:
+                token = vapid_jwt(endpoint)
+                request = urllib.request.Request(
+                    endpoint,
+                    data=b'',
+                    method='POST',
+                    headers={
+                        'Authorization': 'vapid t=' + token + ', k=' + VAPID_PUBLIC,
+                        'Content-Type': 'application/octet-stream',
+                        'Content-Length': '0',
+                        'TTL': '86400',
+                        'Urgency': urgency,
+                    }
+                )
+                with urllib.request.urlopen(request, timeout=10):
+                    delivered += 1
+            except Exception:
+                pass
+        if delivered:
+            queue_message(conn, user_id, title, body, url)
+    wechat_ok = send_pushplus(conn, user_id, title, body) if mode != 'quiet' else False
+    email_ok = send_deadline_email(conn, user_id, title, body)
+    total = delivered + (1 if wechat_ok else 0) + (1 if email_ok else 0)
     if total and check_log:
         with conn:
             conn.execute(
@@ -375,27 +469,129 @@ def deliver_push(conn, user_id, title, body, task_id=None, kind=None, check_log=
     return total
 
 
-def deadline_message(title, left):
+def deadline_message(title, left, task_time=None):
     if left == 0:
-        return '今天，就这件事', '「' + title + '」今天到期。花十分钟先推一下，晚上就踏实了。'
+        if task_time:
+            return '今天 ' + task_time + ' 这件事', '「' + title + '」定在今天 ' + task_time + '。到点前我还会提醒你一次。'
+        return '今天，就这件事', '「' + title + '」今日到期。先动一动手，剩下的交给明天。'
     if left == 1:
-        return '明天的事，今天先动', '「' + title + '」明天到期。今天做一点，明天就不慌。'
+        return '明天的事，今天先动', '「' + title + '」明天到期。不着急，但也别装忘。'
+    if left == 2:
+        return '后天这件，别忘了', '「' + title + '」后天到期。现在动一动，后天就轻松。'
     if left == 3:
-        return '想跟你说一声', '「' + title + '」还有 3 天。不着急，但也别忘。'
+        return '想跟你说一声', '「' + title + '」还有 3 天。不急，但也别装忘。'
     if left == 7:
-        return '一周之后的事', '「' + title + '」还有一周。现在安排，时间绰绰有余。'
-    return '这件事过去了', '「' + title + '」已经过去 ' + str(-left) + ' 天了。要么今天做，要么跟我说改到哪天。'
+        return '一周之后的事', '「' + title + '」还有一周。从容安排，时间绰绰有余。'
+    return '这件事过去了', '「' + title + '」欠了 ' + str(-left) + ' 天。钱可以欠，事欠着心里不踏实。'
+
+
+# 提前多久：按难度打底，再按重要度加权。重要的可以提前到 40 分钟甚至 1 小时
+LEAD_BY_EFFORT = {1: 5, 2: 15, 3: 25, 4: 35, 5: 45}
+LEAD_BONUS_QUAD = {9: 15, 8: 10, 7: 5, 6: 3}     # 重要度越高，越早提醒
+# 两个提醒之间至少隔多久，避免连打（分）
+MIN_GAP_MINUTES = 10
+# 这个点之前不推，免得半夜吵人。早于这个点的任务，改在前一晚提醒
+QUIET_END_HOUR = 6
+EVENING_HOUR = 21
+
+
+def human_left(mins):
+    if mins >= 60:
+        return str(mins // 60) + ' 小时' + (' ' + str(mins % 60) + ' 分钟' if mins % 60 else '')
+    if mins > 0:
+        return str(mins) + ' 分钟'
+    return '几分钟'
+
+
+def lead_for(task):
+    """这条任务该提前多久提醒。难度打底，重要度加权。"""
+    effort = 3
+    quad = 5
+    why = task.get('why')
+    if isinstance(why, dict):
+        try:
+            effort = max(1, min(5, int(why.get('effort') or 3)))
+        except (TypeError, ValueError):
+            effort = 3
+    try:
+        quad = max(1, min(9, int(task.get('quadrant') or 5)))
+    except (TypeError, ValueError):
+        quad = 5
+    lead = LEAD_BY_EFFORT.get(effort, 30) + LEAD_BONUS_QUAD.get(quad, 0)
+    return min(lead, 60)    # 最多提前 1 小时，再早就是打扰了
+
+
+def plan_notifications(tasks, now, already_sent_ids, days_ahead=1):
+    """把带钟点、还没提醒过的任务排成一条时间线。
+    支持今天和明天：早于 QUIET_END_HOUR 的，挪到前一晚 EVENING_HOUR 提醒
+    ——早上六点才提醒六点的事，等于没提醒。
+    返回按通知时刻升序排列的列表，相邻两条至少隔 MIN_GAP_MINUTES 分钟。
+    """
+    items = []
+    for task in tasks:
+        if not isinstance(task, dict) or task.get('status') == 'done':
+            continue
+        raw_time = str(task.get('time') or '').strip()
+        dl = task.get('deadline')
+        if not raw_time or not dl:
+            continue
+        try:
+            due_date = datetime.date.fromisoformat(dl)
+        except ValueError:
+            continue
+        gap_days = (due_date - now.date()).days
+        if gap_days < 0 or gap_days > days_ahead:
+            continue
+        try:
+            hh, mm = raw_time.split(':')
+            due_dt = datetime.datetime.combine(due_date, datetime.time(int(hh), int(mm)))
+        except (ValueError, TypeError):
+            continue
+        task_id = str(task.get('id', ''))
+        if task_id in already_sent_ids:
+            continue
+        lead = lead_for(task)
+        notify_at = due_dt - datetime.timedelta(minutes=lead)
+        # 太早（深夜）就挪到前一晚，别在凌晨吵人
+        if notify_at.hour < QUIET_END_HOUR:
+            prev_evening = datetime.datetime.combine(
+                due_date - datetime.timedelta(days=1),
+                datetime.time(EVENING_HOUR, 0))
+            notify_at = prev_evening
+        # 提醒点已经过去、事情也过了的，不再排进时间线（补推没意义）
+        if notify_at < now and due_dt < now:
+            continue
+        items.append({
+            'task': task, 'task_id': task_id, 'due_dt': due_dt,
+            'notify_at': notify_at, 'lead': lead, 'time': raw_time,
+        })
+
+    items.sort(key=lambda x: (x['notify_at'], x['due_dt']))
+    last_at = None
+    for it in items:
+        if last_at is not None:
+            earliest_ok = last_at + datetime.timedelta(minutes=MIN_GAP_MINUTES)
+            if it['notify_at'] < earliest_ok:
+                latest_ok = it['due_dt'] - datetime.timedelta(minutes=5)
+                it['notify_at'] = min(earliest_ok, latest_ok) if latest_ok > last_at else latest_ok
+        last_at = it['notify_at']
+    return items
 
 
 def push_worker():
+    """每分钟扫一次。按规划好的时间线一条一条推，不打包、不连打。
+    发送失败不记日志，下一分钟自动重试。
+    """
     time.sleep(45)
     while True:
         try:
-            today = datetime.date.today()
+            now = datetime.datetime.now()
+            today = now.date()
             with closing(connect()) as conn:
                 users = conn.execute(
                     'SELECT user_id FROM push_subscriptions '
-                    'UNION SELECT user_id FROM settings WHERE pushplus_token <> \'\''
+                    'UNION SELECT user_id FROM settings WHERE pushplus_token <> \'\' '
+                    'UNION SELECT user_id FROM settings WHERE email_notify = 1'
                 ).fetchall()
                 for row in users:
                     user_id = row['user_id']
@@ -406,29 +602,102 @@ def push_worker():
                         state = json.loads(state_row['data'])
                     except (TypeError, ValueError):
                         continue
-                    for task in state.get('tasks', []):
-                        if not isinstance(task, dict) or task.get('status') == 'done':
-                            continue
-                        deadline = task.get('deadline')
-                        if not deadline:
+
+                    all_tasks = [t for t in state.get('tasks', []) if isinstance(t, dict)]
+                    soon_tasks = []
+                    for task in all_tasks:
+                        dl = task.get('deadline')
+                        if not dl:
                             continue
                         try:
-                            due = datetime.date.fromisoformat(deadline)
+                            gap = (datetime.date.fromisoformat(dl) - today).days
+                        except ValueError:
+                            continue
+                        if 0 <= gap <= 1:      # 今天和明天，明天的是为了"前一晚提醒"
+                            soon_tasks.append(task)
+
+                    # ---- 1. 带钟点的任务：按时间线推，一次一条 ----
+                    sent_rows = conn.execute(
+                        "SELECT task_id, kind FROM push_log WHERE user_id = ? AND sent_date = ?",
+                        (user_id, today.isoformat())
+                    ).fetchall()
+                    sent_ids = set(str(r['task_id']) for r in sent_rows if str(r['kind']).startswith('t'))
+
+                    if now.hour >= QUIET_END_HOUR:
+                        timeline = plan_notifications(today_tasks, now, sent_ids)
+                        for it in timeline:
+                            if it['notify_at'] > now:
+                                break            # 还没到点，后面的更晚
+                            mins = int((it['due_dt'] - now).total_seconds() // 60)
+                            if mins < 0:
+                                continue         # 这个点已经过了，不补推
+                            # 只有"前一晚提醒"才允许在晚间发；当天任务仍按 QUIET_END_HOUR 起
+                            if it['notify_at'].date() < it['due_dt'].date():
+                                if now.hour < EVENING_HOUR:
+                                    continue
+                            task = it['task']
+                            effort = 3
+                            why = task.get('why')
+                            if isinstance(why, dict):
+                                try:
+                                    effort = max(1, min(5, int(why.get('effort') or 3)))
+                                except (TypeError, ValueError):
+                                    effort = 3
+                            left_txt = human_left(mins)
+                            if effort >= 4:
+                                tail = '这活儿费神，手头别的先放一放。'
+                            elif effort <= 2:
+                                tail = '顺手的事，到点做掉就完了。'
+                            else:
+                                tail = '该动手了，别拖到最后一分钟。'
+                            deliver_push(
+                                conn, user_id,
+                                it['time'] + ' 还有 ' + left_txt,
+                                '「' + str(task.get('title', '未命名任务')) + '」。' + tail,
+                                task_id=it['task_id'], kind='t' + it['time'], check_log=True
+                            )
+                            break                # 这一分钟只推一条，下一条下一分钟推
+
+                    # ---- 2. 按天的到期提醒 ----
+                    for task in all_tasks:
+                        dl = task.get('deadline')
+                        if not dl:
+                            continue
+                        try:
+                            due = datetime.date.fromisoformat(dl)
                         except ValueError:
                             continue
                         left = (due - today).days
-                        if left not in (0, 1, 3, 7, -1, -3):
+                        if left not in (0, 1, 2, 3, 7, -1, -3):
                             continue
-                        head, text = deadline_message(str(task.get('title', '未命名任务')), left)
+                        # 第 2 天只在"要紧的事"才打扰，免得噪音
+                        if left == 2:
+                            try:
+                                qv = int(task.get('quadrant') or 5)
+                            except (TypeError, ValueError):
+                                qv = 5
+                            if qv < 8:
+                                continue
+                        head, text = deadline_message(
+                            str(task.get('title', '未命名任务')), left, task.get('time') or None)
                         deliver_push(
                             conn, user_id, head, text,
-                            task_id=str(task.get('id', '')),
-                            kind='d' + str(left),
-                            check_log=True
+                            task_id=str(task.get('id', '')), kind='d' + str(left), check_log=True
                         )
         except Exception:
             pass
-        time.sleep(600)
+        time.sleep(60)
+
+
+def daily_backup_worker():
+    """每小时检查一次：今天还没有备份就备一份。
+    只在启动时备份远远不够——服务不重启，就永远只有启动那天的库。"""
+    while True:
+        try:
+            backup_db()
+        except Exception:
+            pass
+        time.sleep(3600)
 
 
 def hash_password(password, salt_bytes):
@@ -539,6 +808,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     'user': cfg['user'], 'sender': cfg['sender']
                 })
                 return
+            if path == '/api/email/notify':
+                user = session_user(self, conn)
+                if not user:
+                    self._json(401, {'error': '请先登录'})
+                    return
+                self._json(200, {
+                    'enabled': get_email_notify(conn, user['id']),
+                    'mode': get_reminder_mode(conn, user['id']),
+                    'available': smtp_ready(smtp_config(conn)),
+                    'email': user['email']
+                })
+                return
             if path == '/api/pushplus/status':
                 user = session_user(self, conn)
                 if not user:
@@ -579,12 +860,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
                    '/api/push/subscribe', '/api/push/unsubscribe', '/api/push/test',
                    '/api/pushplus/config', '/api/pushplus/test',
                    '/api/email/send-code', '/api/admin/smtp', '/api/admin/smtp/test',
-                   '/api/password/reset')
+                   '/api/password/reset', '/api/email/notify', '/api/email/notify/test',
+                   '/api/reminder/mode')
         if path not in allowed:
             self._json(404, {'error': 'not found'})
             return
         try:
-            body = self._body() if path not in ('/api/logout', '/api/push/test', '/api/pushplus/test', '/api/admin/smtp/test') else {}
+            body = self._body() if path not in ('/api/logout', '/api/push/test', '/api/pushplus/test', '/api/admin/smtp/test', '/api/email/notify/test') else {}
         except (ValueError, UnicodeDecodeError, json.JSONDecodeError):
             self._json(400, {'error': '请求格式错误'})
             return
@@ -607,7 +889,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     self._json(404, {'error': '这个邮箱没有注册过账号'})
                     return
                 last = conn.execute(
-                    'SELECT created_at FROM email_codes WHERE email = ? ORDER BY id DESC LIMIT 1', (email,)
+                    'SELECT created_at FROM email_codes WHERE email = ? AND purpose = ? ORDER BY id DESC LIMIT 1',
+                    (email, purpose)
                 ).fetchone()
                 if last and int(time.time()) - last['created_at'] < 60:
                     self._json(429, {'error': '刚发过验证码，60 秒后再试'})
@@ -738,7 +1021,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     send_email(cfg, test_to, '每日四象限 · 邮件服务已配置',
                                '你收到这封邮件，说明发信设置正确。现在可以开启邮箱验证了。')
                 except Exception as exc:
-                    self._json(400, {'error': '发信测试失败：' + str(exc)[:140] + '。请检查授权码。'})
+                    detail = str(exc)[:140]
+                    hint = ('。授权码错误或该邮箱不支持密码发信' if
+                            ('535' in detail or 'auth' in detail.lower() or 'password' in detail.lower())
+                            else '。检查 SMTP 地址和端口是否正确')
+                    self._json(400, {'error': '发信测试失败：' + detail + hint})
                     return
                 for key, val in (('smtp_host', host), ('smtp_port', port),
                                  ('smtp_user', smtp_user), ('smtp_password', cfg['password']),
@@ -830,6 +1117,49 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 })
                 return
 
+            if path == '/api/email/notify/test':
+                cfg = smtp_config(conn)
+                if not smtp_ready(cfg):
+                    self._json(400, {'error': '管理员还没配置邮件服务'})
+                    return
+                row = conn.execute('SELECT email FROM users WHERE id = ?', (user['id'],)).fetchone()
+                if not row or not row['email']:
+                    self._json(400, {'error': '账号没绑邮箱'})
+                    return
+                try:
+                    send_email(cfg, row['email'], '每日四象限 · 提醒测试',
+                               '如果你看到这封邮件，说明邮件提醒已经通了。')
+                except Exception as exc:
+                    self._json(502, {'error': '发送失败：' + str(exc)[:140]})
+                    return
+                self._json(200, {'ok': True, 'message': '测试邮件已发到你的邮箱'})
+                return
+
+            if path == '/api/reminder/mode':
+                mode = str(body.get('mode', '')).strip()
+                if mode not in ('quiet', 'normal', 'force'):
+                    self._json(400, {'error': '提醒强度只能是 quiet / normal / force'})
+                    return
+                with conn:
+                    conn.execute(
+                        'INSERT INTO settings (user_id, reminder_mode) VALUES (?, ?) '
+                        'ON CONFLICT(user_id) DO UPDATE SET reminder_mode = excluded.reminder_mode',
+                        (user['id'], mode)
+                    )
+                self._json(200, {'ok': True, 'mode': mode})
+                return
+
+            if path == '/api/email/notify':
+                enabled = 1 if body.get('enabled') else 0
+                with conn:
+                    conn.execute(
+                        'INSERT INTO settings (user_id, email_notify) VALUES (?, ?) '
+                        'ON CONFLICT(user_id) DO UPDATE SET email_notify = excluded.email_notify',
+                        (user['id'], enabled)
+                    )
+                self._json(200, {'ok': True, 'enabled': bool(enabled)})
+                return
+
             if path == '/api/pushplus/config':
                 token = str(body.get('token') or '').strip()
                 channel = str(body.get('channel') or 'wechat')
@@ -870,8 +1200,11 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 if __name__ == '__main__':
+    migrate_legacy_db()
     init_db()
+    backup_db()
     threading.Thread(target=push_worker, daemon=True).start()
+    threading.Thread(target=daily_backup_worker, daemon=True).start()
     print('daily-quadrant listening on 0.0.0.0:' + str(PORT) +
           ' (webpush=' + str(bool(VAPID_PUBLIC)) + ', pushplus=' + str(bool(PUSHPLUS_API)) + ')', flush=True)
     Server(('0.0.0.0', PORT), Handler).serve_forever()

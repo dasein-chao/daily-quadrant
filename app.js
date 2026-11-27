@@ -1,12 +1,20 @@
 (function () {
   'use strict';
 
+  // 3×3 九格：编号 = 重要档*3 + 紧急档 + 1，9 最高优先级
   var QUADS = {
-    1: { name: '不做要出事', sub: '就在眼前，先解决' },
-    2: { name: '抽时间做', sub: '不急，但真的重要' },
-    3: { name: '能推就推', sub: '催得紧，没那么要紧' },
-    4: { name: '可以不做', sub: '别为它占用脑子' }
+    9: { name: '立刻解决', sub: '崩溃的前兆之一，就是相信这活非你不可（罗素）' },
+    8: { name: '尽快处理', sub: '明天只是今天的继续，还带着今天的委屈（老舍）' },
+    7: { name: '排进计划', sub: '决定了，应当劳动。第二天：很累，不想劳动了（托尔斯泰）' },
+    6: { name: '先做掉', sub: '催得紧。办了它，世界就清净一小会儿' },
+    5: { name: '看着办', sub: '我也拿不准，看今天心情吧' },
+    4: { name: '抽空弄', sub: '你想干什么？我想游手好闲（毛姆）' },
+    3: { name: '顺手做', sub: '事不大，但毕竟是事，随手打发掉（契诃夫）' },
+    2: { name: '能推就推', sub: '我认为推一推是合法的（化用契诃夫）' },
+    1: { name: '可以不做', sub: '事已至此，先吃饭吧。天塌了也别忘了吃饭' }
   };
+  // 老数据 quadrant 1-4 → 新 9 格映射（旧 1 最高，新 9 最高）
+  var OLD_QUAD_MAP = { 1: 9, 2: 7, 3: 3, 4: 1 };
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
   function toStr(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
@@ -32,7 +40,16 @@
   function $(id) { return document.getElementById(id); }
 
   var state = null;
+  var currentUsername = '';
+  var isGuest = false;
   var loadedDate = todayStr();
+  var GUEST_KEY = 'dq_guest_state';
+  var GUEST_FLAG = 'dq_guest_mode';
+
+  function readGuestState() {
+    try { return JSON.parse(localStorage.getItem(GUEST_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function guestModeOn() { try { return localStorage.getItem(GUEST_FLAG) === '1'; } catch (e) { return false; } }
   var saveChain = Promise.resolve();
 
   function api(method, path, body) {
@@ -58,6 +75,11 @@
     el.className = 'save-state' + (bad ? ' bad' : '');
   }
   function persist() {
+    if (isGuest) {
+      try { localStorage.setItem(GUEST_KEY, JSON.stringify(state)); setSaveState('已存在本机'); }
+      catch (e) { setSaveState('本机存储失败', true); }
+      return;
+    }
     setSaveState('保存中…');
     saveChain = saveChain.then(function () {
       return api('POST', '/api/state', { state: state });
@@ -68,8 +90,29 @@
     });
     return saveChain;
   }
-  function blankState() {
-    return { version: 1, lastOpenDate: todayStr(), tasks: [], reminders: [], pendingReview: null };
+  // 老数据或半截数据缺字段，统一补齐，避免 .filter 崩
+  function normalizeState(s) {
+    var out = s && typeof s === 'object' ? s : {};
+    out.version = 1;
+    if (!Array.isArray(out.tasks)) out.tasks = [];
+    if (!Array.isArray(out.reminders)) out.reminders = [];
+    if (!out.pendingReview || !Array.isArray(out.pendingReview.taskIds)) out.pendingReview = null;
+    if (!out.lastOpenDate) out.lastOpenDate = todayStr();
+    out.tasks.forEach(function (t) {
+      if (!Array.isArray(t.history)) t.history = [];
+      var q = +t.quadrant;
+      if (OLD_QUAD_MAP[q] && !(t.why && t.why.impact)) t.quadrant = OLD_QUAD_MAP[q];
+      if (!(t.quadrant >= 1 && t.quadrant <= 9)) t.quadrant = 5;
+      if (!t.why) t.why = {};
+      if (!(t.why.effort >= 1 && t.why.effort <= 5)) t.why.effort = 3;
+      // 时间必须是合法的 HH:MM，脏值直接清掉，别显示成「25:99 到点」
+      if (t.time) {
+        var mt = String(t.time).match(/^(\d{1,2}):(\d{2})$/);
+        if (!mt || +mt[1] > 23 || +mt[2] > 59) t.time = '';
+        else t.time = ('0' + mt[1]).slice(-2) + ':' + mt[2];
+      }
+    });
+    return out;
   }
 
   function activeTasks() { return state.tasks.filter(function (t) { return t.status !== 'done'; }); }
@@ -92,7 +135,7 @@
       setHistory(t, prev, t.status);
       t.carryCount = (t.carryCount || 0) + gap;
       t.lastCarryDate = today;
-      if (t.deadline && diffDays(t.deadline, today) > 0) t.quadrant = 1;
+      if (t.deadline && diffDays(t.deadline, today) > 0) t.quadrant = 9;
     });
     state.pendingReview = { date: prev, gap: gap, taskIds: ids };
     state.lastOpenDate = today;
@@ -101,47 +144,97 @@
   function rebuildReminders() {
     var today = todayStr();
     var list = [];
+    var pastList = [];      // 今天已经过点的任务，攒起来合并成一条
     activeTasks().forEach(function (t) {
       var left = t.deadline ? -diffDays(t.deadline, today) : null;
       if (left !== null && left < 0) {
         list.push({ id: uid(), date: today, type: 'danger', tag: '过期了',
-          text: '「' + t.title + '」已经过去 ' + (-left) + ' 天了。要么今天做，要么跟我说一声改到哪天。', taskId: t.id });
+          text: '「' + t.title + '」欠了 ' + (-left) + ' 天。钱可以欠，事欠着心里不踏实。', taskId: t.id });
       } else if (left === 0) {
-        list.push({ id: uid(), date: today, type: 'warn', tag: '就是今天',
-          text: '「' + t.title + '」今天到期。现在做一点，晚上就不慌了。', taskId: t.id });
-      } else if (left !== null && left <= 2 && t.quadrant === 2) {
+        var todayMsg;
+        if (t.time) {
+          // 有具体钟点：说清几点、过了没有；窗口按难度走
+          var nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+          var parts = String(t.time).split(':');
+          var dueMin = (+parts[0]) * 60 + (+parts[1] || 0);
+          var eff = (t.why && t.why.effort) || 3;
+          // 提前量与后端一致：难度打底 + 重要度加权
+          var baseLead = { 1: 5, 2: 15, 3: 25, 4: 35, 5: 45 }[eff] || 25;
+          var bonusLead = { 9: 15, 8: 10, 7: 5, 6: 3 }[(t.quadrant || 5)] || 0;
+          var lead = Math.min(baseLead + bonusLead, 60);
+          var away = dueMin - nowMin;
+          if (nowMin > dueMin && dueMin > 0) {
+            pastList.push(t.time + ' ' + t.title);
+            return;             // 先攒着，最后合并成一条
+          } else if (away >= 0 && away <= lead) {
+            var awayTxt = away >= 60 ? (Math.floor(away / 60) + ' 小时' + (away % 60 ? ' ' + (away % 60) + ' 分钟' : '')) : (away + ' 分钟');
+            todayMsg = '「' + t.title + '」' + t.time + ' 就要到了，还有 ' + awayTxt +
+              (eff >= 4 ? '。这活儿费神，手头别的先放一放。' : '。');
+          } else {
+            todayMsg = '「' + t.title + '」今天 ' + t.time + '。还早，但别忘。';
+          }
+        } else {
+          todayMsg = '「' + t.title + '」今日到期。先动一动手，剩下的交给明天。';
+        }
+        list.push({ id: uid(), date: today, type: 'warn', tag: t.time ? (t.time + ' 到点') : '就是今天',
+          text: todayMsg, taskId: t.id });
+      } else if (left !== null && left <= 2 && t.quadrant >= 7) {
         list.push({ id: uid(), date: today, type: 'tip', tag: '说一声',
-          text: '「' + t.title + '」还有 ' + left + ' 天。今天花十分钟推一下，后面就轻松了。', taskId: t.id });
+          text: '「' + t.title + '」还有 ' + left + ' 天。不着急，但也别装忘。', taskId: t.id });
       }
       if ((t.carryCount || 0) >= 3) {
         list.push({ id: uid(), date: today, type: 'warn', tag: '总是推',
-          text: '「' + t.title + '」你已经往后放了 ' + t.carryCount + ' 次。是不是该拆小点，或者干脆不做了？', taskId: t.id });
+          text: '「' + t.title + '」已经推了 ' + t.carryCount + ' 回。它大概也累了，要么拆小，要么放它走。', taskId: t.id });
       }
       if (!t.deadline) {
         list.push({ id: uid(), date: today, type: 'tip', tag: '没定时间',
-          text: '「' + t.title + '」还没定时间。你想哪天之前做完？', taskId: t.id });
+          text: '「' + t.title + '」没定日子。不定也行，就是会一直惦记。', taskId: t.id });
       }
     });
     var actives = activeTasks();
-    if (actives.length >= 3 && !actives.some(function (t) { return t.quadrant === 2; })) {
+    if (actives.length >= 3 && !actives.some(function (t) { return t.quadrant >= 7; })) {
       list.push({ id: uid(), date: today, type: 'tip', tag: '说一句',
-        text: '今天全是救火的活。有没有一件是「不急但真该做」的？给它留十分钟。', taskId: null });
+        text: '今天全是救火的活。救到最后常常一场空——挑一件不急但要紧的，留十分钟。', taskId: null });
     }
+    if (pastList.length) {
+      var pText = pastList.length === 1
+        ? '「' + pastList[0] + '」过点了。做了就划掉，没做就改个时间。'
+        : pastList.join('、') + '，都过点了。做了就划掉，没做就改个时间。';
+      list.push({ id: uid(), date: today, type: 'warn', tag: '过点了', text: pText, taskId: null });
+    }
+
     state.reminders = state.reminders.filter(function (r) { return r.date !== today; }).concat(list);
   }
 
+  function isQuickTask(t) {
+    var effort = (t.why && t.why.effort) || 3;
+    if (effort > 2) return false;
+    // 只有"不重要"的顺手事才进这里。「交房租」难度低但重要，仍归正事
+    if ((t.quadrant || 5) > 6) return false;
+    if (t.deadline && -diffDays(t.deadline, todayStr()) < 0) return false;
+    return true;
+  }
   function pickThree(today) {
-    var list = activeTasks().slice();
+    // 举手之劳的事进「顺手清掉」，不占今天三件的名额
+    var list = activeTasks().filter(function (t) { return !isQuickTask(t); });
     function score(t) {
       var left = t.deadline ? -diffDays(t.deadline, today) : 99;
       var s = 0;
-      if (left < 0) s += 1000 + (-left) * 10;
-      else if (left === 0) s += 900;
+      // 逾期加分封顶：拖再久也不该永远压在今天的正事前面
+      if (left < 0) s += 1000 + Math.min(-left, 5) * 10;
+      else if (left === 0) {
+        s += 900;
+        // 今天且定了具体钟点：到点就得在场，比陈年逾期更硬
+        if (t.time) s += 250;
+      }
       else if (left === 1) s += 700;
       else if (left <= 3) s += 500;
       else if (left <= 7) s += 300;
       else s += 100;
-      s += (5 - (t.quadrant || 2)) * 40;
+      s += (t.quadrant || 5) * 40;
+      // 难度只微调先后：举手之劳上浮，大工程略降，不改变象限
+      var effort = (t.why && t.why.effort) || 3;
+      s += (4 - effort) * 12;
       if (t.status === 'partial') s += 60;
       s += Math.min(t.carryCount || 0, 10) * 5;
       return s;
@@ -149,21 +242,117 @@
     list.sort(function (a, b) { return score(b) - score(a); });
     return list.slice(0, 3);
   }
+  // 按任务类型给一句关心，别全是同一个腔调
+  var TYPE_CARE = [
+    { re: /买|购|下单|挑|订|置办/, care: '买之前想一眼用在哪，能立刻用上就现在就买' },
+    { re: /写|改|稿|报告|论文|方案|总结|文档/, care: '先写下最难的那一句，剩下的会自己接上来' },
+    { re: /学|读|看|背|练|听课|复习|刷题/, care: '别求一次学完，先专注二十分钟就够' },
+    { re: /约|联系|问|聊|沟通|电话|回复|回信/, care: '对方也在等你，一句话就能推进' },
+    { re: /交|提交|上传|报名|申请|寄|送/, care: '交了才算完，别卡在最后一厘米' },
+    { re: /修|装|整理|打扫|收拾|洗|搬/, care: '动起手来比想快，先做五分钟' },
+    { re: /开会|会|面试|汇报|答辩/, care: '准备三句话就够开场，剩下的现场能接' }
+  ];
+  function careFor(t) {
+    var title = String(t.title || '');
+    for (var i = 0; i < TYPE_CARE.length; i++) {
+      if (TYPE_CARE[i].re.test(title)) return TYPE_CARE[i].care;
+    }
+    return '';
+  }
+  // 和后端一致：按难度+重要度算提前量，再按队列错峰，得出"每条会在几点提醒"
+  var LEAD_BY_EFFORT = { 1: 5, 2: 15, 3: 25, 4: 35, 5: 45 };
+  var LEAD_BONUS_QUAD = { 9: 15, 8: 10, 7: 5, 6: 3 };
+  var MIN_GAP = 10;
+
+  function leadFor(t) {
+    var e = (t.why && t.why.effort) || 3;
+    var q = t.quadrant || 5;
+    return Math.min((LEAD_BY_EFFORT[e] || 25) + (LEAD_BONUS_QUAD[q] || 0), 60);
+  }
+
+  // 返回 { taskId: {label, state} }：state = 'upcoming' | 'past' | 'early'
+  // 和后端同一套：难度+重要度算提前量，排队错峰，早于 6 点的挪到前一晚 21:00
+  function planReminders() {
+    var today = todayStr();
+    var tomorrow = shiftDay(today, 1);
+    var now = new Date();
+    var nowMin = now.getHours() * 60 + now.getMinutes();
+    var list = activeTasks().filter(function (t) {
+      return t.time && (t.deadline === today || t.deadline === tomorrow);
+    });
+
+    var items = list.map(function (t) {
+      var p = String(t.time).split(':');
+      var dueMin = (+p[0]) * 60 + (+p[1] || 0);
+      var lead = leadFor(t);
+      var notifyMin = dueMin - lead;
+      var isTomorrow = t.deadline === tomorrow;
+      var prevEvening = false;
+      if (notifyMin < 360) { notifyMin = 21 * 60; prevEvening = true; }
+      return { t: t, dueMin: dueMin, notifyMin: notifyMin, isTomorrow: isTomorrow, prevEvening: prevEvening, lead: lead };
+    });
+
+    // 只给"今天"排队；明天的单独算，避免跨天错峰算乱
+    var todays = items.filter(function (it) { return !it.isTomorrow; });
+    todays.sort(function (a, b) {
+      if (a.notifyMin !== b.notifyMin) return a.notifyMin - b.notifyMin;
+      return a.dueMin - b.dueMin;
+    });
+    var last = null;
+    todays.forEach(function (it) {
+      if (last !== null) {
+        var earliest = last + MIN_GAP;
+        if (it.notifyMin < earliest) {
+          var latest = it.dueMin - 5;
+          it.notifyMin = latest > last ? Math.min(earliest, latest) : latest;
+        }
+      }
+      last = it.notifyMin;
+    });
+
+    var map = {};
+    items.forEach(function (it) {
+      var m = ((it.notifyMin % 1440) + 1440) % 1440;
+      var h = Math.floor(m / 60), mm = m % 60;
+      var hhmm = (h < 10 ? '0' : '') + h + ':' + (mm < 10 ? '0' : '') + mm;
+
+      if (it.isTomorrow) {
+        // 按钟点说人话：上午说「明早」，午后说「明天」，傍晚后说「明晚」
+        var dayWord = it.prevEvening ? '今晚 ' : (h < 11 ? '明早 ' : (h < 18 ? '明天 ' : '明晚 '));
+        map[it.t.id] = { label: dayWord + hhmm + ' 提醒', state: it.prevEvening ? 'tonight' : 'tomorrow' };
+        return;
+      }
+      // 今天：事情本身已经过去，直接说已过点，别再承诺任何"提醒"
+      if (nowMin > it.dueMin) {
+        map[it.t.id] = { label: '已过点', state: 'past' };
+      } else if (it.prevEvening) {
+        map[it.t.id] = { label: '前一晚 21:00 提醒', state: 'early' };
+      } else if (nowMin >= it.notifyMin) {
+        map[it.t.id] = { label: '已提醒 · ' + hhmm, state: 'notified' };
+      } else {
+        map[it.t.id] = { label: hhmm + ' 提醒', state: 'upcoming' };
+      }
+    });
+    return map;
+  }
+
   function reasonFor(t, today) {
     var left = t.deadline ? -diffDays(t.deadline, today) : null;
     if (left !== null && left < 0) return '已经过去 ' + (-left) + ' 天了，今天得处理';
     if (left === 0) return '今天到期，早点做完踏实';
+    if (t.quadrant >= 8) return '不做要出事，先解决它';
     if (left === 1) return '明天到期，今天先推一步';
-    if (t.quadrant === 1) return '不做要出事，先解决它';
-    if (t.quadrant === 2) return '不急，但真的重要，别再拖';
-    if (t.quadrant === 3) return '催得急，顺手处理掉';
+    var care = careFor(t);
+    if (care) return care;
+    if (t.quadrant >= 6) return '挺重要，今天推一下';
+    if (t.quadrant >= 4) return '有空就做，别一直拖';
     return '空下来再说';
   }
   function renderFocus(today) {
     var three = pickThree(today);
-    $('focusHint').textContent = three.length ? '从 ' + activeTasks().length + ' 件里挑的，先做这些' : '清单是空的';
+    $('focusHint').textContent = three.length ? '从 ' + activeTasks().length + ' 件里挑的，先对付这些' : '今天没有非做不可的';
     if (!three.length) {
-      $('focusList').innerHTML = '<div class="empty">还没有任务。点右上角「加一件事」，说出来就行。</div>';
+      $('focusList').innerHTML = '<div class="empty">今天没事。这种日子不多，享受一下。想起来了点右上角说一句。</div>';
       return;
     }
     $('focusList').innerHTML = three.map(function (t, i) {
@@ -176,6 +365,19 @@
     }).join('');
   }
 
+  function renderQuick() {
+    var quick = activeTasks().filter(isQuickTask);
+    $('quickPanel').classList.toggle('hidden', quick.length === 0);
+    $('quickCount').textContent = quick.length;
+    $('quickList').innerHTML = quick.map(function (t) {
+      return '<div class="focus-item quick-item">' +
+        '<div class="focus-body"><div class="focus-title">' + esc(t.title) + '</div>' +
+        '<div class="focus-why">举手之劳 · 做完就忘了它</div></div>' +
+        '<button class="btn small primary" data-act="done" data-id="' + esc(t.id) + '">做完了</button>' +
+        '</div>';
+    }).join('');
+  }
+
   function render() {
     var today = todayStr();
     var week = ['日', '一', '二', '三', '四', '五', '六'][new Date().getDay()];
@@ -183,23 +385,25 @@
       '<span class="date-dot">·</span>' + activeTasks().length + ' 项待办';
 
     renderFocus(today);
+    renderQuick();
 
     var rem = state.reminders.filter(function (r) { return r.date === today; });
     $('reminderCount').textContent = rem.length ? '(' + rem.length + ')' : '';
     $('reminderList').innerHTML = rem.length ? rem.map(function (r) {
       var btn = r.taskId ? '<button class="btn small ghost go" data-focus="' + esc(r.taskId) + '">定位</button>' : '';
       return '<div class="reminder ' + r.type + '"><span class="tag">' + esc(r.tag) + '</span><span>' + esc(r.text) + '</span>' + btn + '</div>';
-    }).join('') : '<div class="empty">今天没有提醒。保持这个节奏。</div>';
+    }).join('') : '<div class="empty">今天没有提醒。什么都不想做，就在床上懒着。</div>';
 
+    var reminderPlan = planReminders();
     var html = '';
-    for (var q = 1; q <= 4; q++) {
+    for (var q = 9; q >= 1; q--) {
       var items = activeTasks().filter(function (t) { return t.quadrant === q; });
       html += '<section class="panel quad q' + q + '">';
       html += '<h2><span class="dot"></span>' + QUADS[q].name + '<span class="badge">' + items.length + '</span></h2>';
       html += '<div class="sub">' + QUADS[q].sub + '</div>';
       html += '<div class="tasks">';
       if (!items.length) {
-        html += '<div class="quad-empty">这里还是空的</div>';
+        html += '<div class="quad-empty">此处清白，尚无俗事</div>';
       } else {
         items.sort(function (a, b) { return (a.deadline || '9999').localeCompare(b.deadline || '9999'); });
         items.forEach(function (t) {
@@ -207,9 +411,17 @@
           var overdue = left !== null && left < 0;
           var cls = 'task' + (overdue ? ' overdue' : '') + (t.status === 'partial' ? ' partial' : '');
           var badges = '';
-          if (overdue) badges += '<span class="badge red">逾期 ' + (-left) + ' 天</span>';
-          else if (left === 0) badges += '<span class="badge amber">今天截止</span>';
-          else if (left !== null) badges += '<span class="badge">' + t.deadline + ' · 剩 ' + left + ' 天</span>';
+          var timeTag = t.time ? ' ' + t.time : '';
+          var timeTag = t.time ? ' ' + t.time : '';
+          if (overdue) badges += '<span class="badge red">逾期 ' + (-left) + ' 天' + timeTag + '</span>';
+          else if (left === 0) badges += '<span class="badge amber">今天截止' + timeTag + '</span>';
+          else if (left !== null) badges += '<span class="badge">' + t.deadline + timeTag + ' · 剩 ' + left + ' 天</span>';
+          // 有钟点的任务，明确告诉用户"几点会提醒你"，别让规划成黑箱
+          var rp = reminderPlan[t.id];
+          if (t.time && rp) {
+            var rpCls = (rp.state === 'past' || rp.state === 'notified') ? ' class="badge muted"' : ' class="badge"';
+            badges += '<span' + rpCls + '>' + rp.label + '</span>';
+          }
           if ((t.carryCount || 0) > 0) badges += '<span class="badge amber">顺延 ' + t.carryCount + ' 次</span>';
           if (t.status === 'partial') badges += '<span class="badge blue">部分完成</span>';
           html += '<article class="' + cls + '" id="task-' + esc(t.id) + '">';
@@ -218,14 +430,15 @@
           html += '<div class="task-meta">' + badges + '</div>';
           html += '<div class="task-actions">';
           html += '<select data-act="quad" data-id="' + esc(t.id) + '" aria-label="调整象限">';
-          for (var k = 1; k <= 4; k++) {
+          for (var k = 9; k >= 1; k--) {
             html += '<option value="' + k + '"' + (t.quadrant === k ? ' selected' : '') + '>' + QUADS[k].name + '</option>';
           }
           html += '</select>';
           html += '<input type="date" data-act="deadline" data-id="' + esc(t.id) + '" value="' + esc(t.deadline || '') + '" aria-label="修改截止日期">';
+          html += '<input type="text" inputmode="numeric" maxlength="5" placeholder="14:00" data-act="time" data-id="' + esc(t.id) + '" value="' + esc(t.time || '') + '" aria-label="修改时间，如 14:00，留空则只按天提醒" class="time-input">';
           html += '<button class="btn small" data-act="partial" data-id="' + esc(t.id) + '">部分完成</button>';
           html += '<button class="btn small" data-act="done" data-id="' + esc(t.id) + '">完成</button>';
-          html += '<button class="btn small ghost" data-act="del" data-id="' + esc(t.id) + '">删除</button>';
+          html += '<button class="btn small ghost del-btn" data-act="del" data-id="' + esc(t.id) + '">删除</button>';
           html += '</div></article>';
         });
       }
@@ -238,7 +451,7 @@
     $('doneList').innerHTML = done.length ? done.map(function (t) {
       return '<div class="done-item"><span class="task-title done">' + esc(t.title) + '</span>' +
         '<button class="btn small ghost" data-act="undo" data-id="' + esc(t.id) + '">撤销</button></div>';
-    }).join('') : '<div class="empty">今天还没有完成的任务。</div>';
+    }).join('') : '<div class="empty">今天还没做成什么。什么都不想做，就在床上懒着。</div>';
   }
 
   function refresh() { rebuildReminders(); render(); persist(); }
@@ -322,9 +535,8 @@
 
   function loadWechatState() {
     api('GET', '/api/pushplus/status').then(function (r) {
-      $('wechatState').textContent = r.configured ? ('已配置 · ' + r.channel) : '未配置';
       $('wxChannel').value = r.channel || 'wechat';
-    }).catch(function () { $('wechatState').textContent = '读取配置失败'; });
+    }).catch(function () {});
   }
   function saveWechat() {
     var token = $('wxToken').value.trim();
@@ -394,7 +606,7 @@
     $('authPass').autocomplete = mode === 'login' ? 'current-password' : 'new-password';
     $('authUser').closest('.field').classList.toggle('hidden', mode === 'reset');
     $('emailField').classList.toggle('hidden', mode === 'login');
-    $('codeField').classList.toggle('hidden', mode === 'login');
+    $('codeField').classList.toggle('hidden', mode !== 'register' || !authConfig.emailVerified);
     $('emailRequiredHint').textContent = authConfig.emailVerified ? '（必填，要收验证码）' : '（必填）';
     $('authPass').closest('.field').querySelector('label').childNodes[0].nodeValue = (mode === 'reset' ? '新密码' : '密码');
     $('authNote').textContent = mode === 'login'
@@ -451,7 +663,15 @@
       $('authSubmit').disabled = true;
       api('POST', '/api/password/reset', { email: email, code: code, password: password })
         .then(function (r) {
-          setAuthMode('login');
+          $('guestBtn').onclick = function () { startGuest(); };
+  $('guestRegisterBtn').onclick = function () {
+    isGuest = false;
+    $('appShell').classList.add('hidden');
+    $('authScreen').classList.remove('hidden');
+    setAuthMode('register');
+  };
+
+  setAuthMode('login');
           $('authUser').value = '';
           $('authPass').value = '';
           $('authEmail').value = '';
@@ -493,36 +713,74 @@
   };
   $('authPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('authSubmit').click(); });
 
+  $('guestBtn').onclick = function () { startGuest(); };
+  $('guestRegisterBtn').onclick = function () {
+    isGuest = false;
+    $('appShell').classList.add('hidden');
+    $('authScreen').classList.remove('hidden');
+    setAuthMode('register');
+  };
+
   setAuthMode('login');
+  if (guestModeOn()) startGuest();
   var lastAccount = knownAccounts()[0];
   if (lastAccount) $('authUser').value = lastAccount;
   renderSavedAccounts();
 
   $('logoutBtn').onclick = function () {
+    if (isGuest) {
+      try { localStorage.removeItem(GUEST_FLAG); localStorage.removeItem(GUEST_KEY); } catch (e) {}
+      location.reload();
+      return;
+    }
     api('POST', '/api/logout').then(function () { location.reload(); }).catch(function (e) { alert(e.message); });
   };
 
   var isAdmin = false;
-  function start(username, adminFlag) {
-    isAdmin = !!adminFlag;
+  function enterApp() {
     $('authScreen').classList.add('hidden');
     $('appShell').classList.remove('hidden');
-    $('whoAmI').textContent = username ? '(' + username + ')' : '';
     $('adminPanel').classList.toggle('hidden', !isAdmin);
+    $('reminderOpenBtn').classList.toggle('hidden', isGuest);
     if (isAdmin) loadSmtpState();
-    api('GET', '/api/state').then(function (r) {
-      state = r.state && Array.isArray(r.state.tasks) ? r.state : blankState();
-      loadedDate = todayStr();
-      rollover(loadedDate);
-      rebuildReminders();
-      render();
-      persist();
+    loadedDate = todayStr();
+    rollover(loadedDate);
+    rebuildReminders();
+    render();
+    persist();
+    if (!isGuest) {
       loadPushState();
       loadWechatState();
-      if (state.pendingReview && state.pendingReview.taskIds.length) setTimeout(openReview, 300);
+      loadEmailNotify();
+    }
+    if (state.pendingReview && state.pendingReview.taskIds.length) setTimeout(openReview, 300);
+  }
+  function start(username, adminFlag) {
+    isGuest = false;
+    try { localStorage.removeItem(GUEST_FLAG); } catch (e) {}
+    currentUsername = username || '';
+    isAdmin = !!adminFlag;
+    $('whoAmI').textContent = username ? '(' + username + ')' : '';
+    $('guestBadge').classList.add('hidden');
+    $('guestUpgrade').classList.add('hidden');
+    api('GET', '/api/state').then(function (r) {
+      state = normalizeState(r.state);
+      enterApp();
     }).catch(function (e) {
       alert('读取任务失败：' + e.message);
     });
+  }
+  function startGuest() {
+    isGuest = true;
+    try { localStorage.setItem(GUEST_FLAG, '1'); } catch (e) {}
+    isAdmin = false;
+    currentUsername = '';
+    state = normalizeState(readGuestState());
+    $('whoAmI').textContent = '';
+    $('guestBadge').classList.remove('hidden');
+    $('guestUpgrade').classList.remove('hidden');
+    setSaveState('已存在本机');
+    enterApp();
   }
 
   // 三步捕获向导：说出来 → 确认理解 → 两个小问题
@@ -552,19 +810,33 @@
     var raw = $('wzInput').value.trim();
     if (!raw) { $('wzError1').textContent = '随便说一句就行，比如「明天交房租」。'; return; }
     var parsed = window.Capture.parse(raw);
-    if (parsed.title.length < 2) { $('wzError1').textContent = '再多说几个字，我没听明白要做什么。'; return; }
+    if (!parsed.title || !parsed.title.trim()) {
+      var heard = parsed.deadline ? window.Capture.friendlyDate(parsed.deadline, parsed.time) : '';
+      $('wzError1').textContent = heard
+        ? '时间我听懂了：' + heard + '。还差一句——做什么？'
+        : '再多说几个字，我没听明白要做什么。比如「明天交房租」。';
+      return;
+    }
     draft.title = parsed.title;
     draft.deadline = parsed.deadline || shiftDay(todayStr(), 3);
+    draft.time = parsed.time || '';
     $('wzTitle').value = draft.title;
-    $('wzDatePreview').textContent = window.Capture.friendlyDate(draft.deadline);
+    $('wzDatePreview').textContent = window.Capture.friendlyDate(draft.deadline, draft.time);
     $('wzDate').value = draft.deadline;
-    $('wzError2').textContent = parsed.matched ? '' : '没听出时间，我先放了三天后，你可以改。';
+    if (parsed.shifted) {
+      $('wzError2').textContent = '这个点今天过了，我挪到明天 ' + (parsed.time || '') + '。不对就自己改。';
+      $('wzError2').style.color = '#92400e';
+    } else if (!parsed.matched) {
+      $('wzError2').textContent = '没听出时间，我先放了三天后，你可以改。';
+    } else {
+      $('wzError2').textContent = '';
+    }
     showWizardPage(2);
   };
   $('wzBack2').onclick = function () { showWizardPage(1); };
   $('wzNext2').onclick = function () {
     var name = $('wzTitle').value.trim();
-    if (name.length < 2) { $('wzError2').textContent = '写清楚要做什么，哪怕两三个字。'; return; }
+    if (!name) { $('wzError2').textContent = '写清楚要做什么，一个字也行。'; return; }
     if (!$('wzDate').value) { $('wzError2').textContent = '定个日期吧，这样明天才能提醒你。'; return; }
     if (diffDays(todayStr(), $('wzDate').value) < 0) { $('wzError2').textContent = '日期不能早于今天。'; return; }
     draft.title = name;
@@ -573,7 +845,7 @@
     updateWizardResult();
   };
   $('wzBack3').onclick = function () { showWizardPage(2); };
-  ['qImpact', 'qUrgency'].forEach(function (id) {
+  ['qImpact', 'qUrgency', 'qEffort'].forEach(function (id) {
     $(id).addEventListener('click', function (e) {
       var btn = e.target.closest('button');
       if (!btn) return;
@@ -585,26 +857,33 @@
   function updateWizardResult() {
     var impact = $('qImpact').querySelector('.sel').getAttribute('data-v');
     var urgency = $('qUrgency').querySelector('.sel').getAttribute('data-v');
+    var effort = $('qEffort').querySelector('.sel').getAttribute('data-v');
     var q = window.Capture.quadrant(impact, urgency, true);
-    draft.impact = +impact; draft.urgency = +urgency; draft.quadrant = q;
-    var names = { 1: '马上做', 2: '抽时间做', 3: '能推就推', 4: '可以不做' };
-    var why = {
-      1: '不做要出事，而且就在眼前。',
-      2: '不做有麻烦，但不急在这一刻。',
-      3: '催得紧，但其实没那么要紧。',
-      4: '两头都不沾，先放到一边。'
-    };
-    $('wzResult').innerHTML = '<div class="wr-label">我打算把它放在</div><div class="wr-main">' + names[q] +
-      '</div><div class="wr-why">' + why[q] + '</div>';
+    draft.impact = +impact; draft.urgency = +urgency; draft.effort = +effort; draft.quadrant = q;
+    var effortHint = +effort <= 2 ? '，会进「顺手清掉」' : '';
+    $('wzResult').innerHTML = '<div class="wr-label">我打算把它放在</div><div class="wr-main">' + QUADS[q].name +
+      '</div><div class="wr-why">' + QUADS[q].sub + '（重要 ' + impact + '/5 · 紧急 ' + urgency + '/5 · 费劲 ' + effort + '/5' + effortHint + '）</div>';
   }
   $('wzSave').onclick = function () {
     if (!draft.title || !draft.deadline) { $('wzError3').textContent = '前面的信息没了，请从头再来一次。'; return; }
+    // 同名未完成的任务：问一句，不硬拦
+    var dup = activeTasks().filter(function (t) {
+      return t.title.replace(/\s/g, '') === draft.title.replace(/\s/g, '');
+    })[0];
+    if (dup) {
+      var goOn = window.confirm('「' + dup.title + '」已经有一条，' + dup.deadline + '，还没做完。\n\n真要再来一条？\n确定 = 确实有两件事\n取消 = 不重复记，回清单看那条');
+      if (!goOn) {
+        $('addMask').classList.remove('show');
+        refresh();
+        return;
+      }
+    }
     state.tasks.push({
       id: uid(), title: draft.title, note: '',
-      quadrant: draft.quadrant || 2, deadline: draft.deadline,
+      quadrant: draft.quadrant || 2, deadline: draft.deadline, time: draft.time || '',
       createdDate: todayStr(), status: 'pending', statusDate: null,
       carryCount: 0, lastCarryDate: null, history: [], doneDate: null,
-      why: { impact: draft.impact, urgency: draft.urgency }
+      why: { impact: draft.impact, urgency: draft.urgency, effort: draft.effort }
     });
     $('addMask').classList.remove('show');
     refresh();
@@ -659,7 +938,29 @@
     if (act === 'deadline') {
       if (!e.target.value) { alert('截止日期不能为空。想取消请删除任务。'); render(); return; }
       t.deadline = e.target.value;
-      if (diffDays(t.deadline, todayStr()) > 0) t.quadrant = 1;
+      if (diffDays(t.deadline, todayStr()) > 0) t.quadrant = 9;
+      refresh();
+    }
+    if (act === 'time') {
+      // 允许 14:00 / 9:30 / 930 / 1430 几种写法；留空就是清掉，只按天提醒
+      var rawT = String(e.target.value || '').trim().replace(/[：.]/g, ':');
+      if (!rawT) {
+        t.time = '';
+        refresh();
+        return;
+      }
+      var mm2 = rawT.match(/^(\d{1,2}):(\d{1,2})$/);
+      if (!mm2) mm2 = rawT.match(/^(\d{1,2})(\d{2})$/);
+      if (mm2) {
+        var h2 = +mm2[1], n2 = +mm2[2];
+        if (h2 <= 23 && n2 <= 59) {
+          t.time = ('0' + h2).slice(-2) + ':' + ('0' + n2).slice(-2);
+        } else {
+          alert('时间不对，写成 14:00 这样。');
+        }
+      } else {
+        alert('时间不对，写成 14:00 这样。留空就是只按日期提醒。');
+      }
       refresh();
     }
   });
@@ -727,7 +1028,7 @@
       t.status = d.status;
       t.statusDate = todayStr();
       t.doneDate = d.status === 'done' ? todayStr() : null;
-      if (diffDays(d.deadline, todayStr()) > 0) t.quadrant = 1;
+      if (diffDays(d.deadline, todayStr()) > 0) t.quadrant = 9;
       setHistory(t, reviewDate, d.status);
     });
     state.pendingReview = null;
@@ -766,13 +1067,125 @@
     e.target.value = '';
   };
 
-  $('guideHead').onclick = function () { $('guide').classList.toggle('collapsed'); };
+  // 首次来的人需要看到步骤；老用户收起过一次就记住
+  try {
+    if (localStorage.getItem('dq_guide_collapsed') === '1') $('guide').classList.add('collapsed');
+  } catch (e) {}
+  $('guideHead').onclick = function () {
+    var collapsed = $('guide').classList.toggle('collapsed');
+    try { localStorage.setItem('dq_guide_collapsed', collapsed ? '1' : '0'); } catch (e) {}
+  };
+
+  $('reminderOpenBtn').onclick = function () {
+    $('reminderMask').classList.add('show');
+  };
+  $('reminderClose').onclick = function () { $('reminderMask').classList.remove('show'); };
+  $('reminderMask').addEventListener('click', function (e) {
+    if (e.target === $('reminderMask')) $('reminderMask').classList.remove('show');
+  });
+
+  $('quickHead').onclick = function () {
+    var box = $('quickList');
+    var hidden = box.classList.toggle('hidden');
+    $('quickChevron').classList.toggle('up', hidden);
+  };
+
+  $('moreBtn').onclick = function () {
+    var open = $('headerActions').classList.toggle('menu-open');
+    $('moreBtn').textContent = open ? '收起 ▴' : '更多（提醒·账号·导出）▾';
+  };
+
+  // 添加到主屏幕引导：只在浏览器里、未安装时显示
+  (function initInstallBanner() {
+    var standalone = window.navigator.standalone === true ||
+      window.matchMedia('(display-mode: standalone)').matches;
+    if (standalone) return;
+    var dismissed = false;
+    try { dismissed = localStorage.getItem('dq_install_dismissed') === '1'; } catch (e) {}
+    if (dismissed) return;
+    var ua = navigator.userAgent;
+    var isIOS = /iPad|iPhone|iPod/.test(ua);
+    $('installHint').textContent = isIOS
+      ? '点底部分享按钮 → 添加到主屏幕，推送才稳定'
+      : '点浏览器菜单 → 添加到主屏幕，打开更快';
+    $('installBanner').classList.remove('hidden');
+    $('installDismiss').onclick = function () {
+      $('installBanner').classList.add('hidden');
+      try { localStorage.setItem('dq_install_dismissed', '1'); } catch (e) {}
+    };
+  })();
 
   $('refreshBtn').onclick = refresh;
   $('pushEnableBtn').onclick = togglePush;
   $('pushTestBtn').onclick = testPush;
   $('wxSave').onclick = saveWechat;
   $('wxTest').onclick = testWechat;
+
+  $('accountBtn').onclick = function () {
+    $('acctName').textContent = currentUsername || '—';
+    $('acctEmail').textContent = '读取中…';
+    $('acctRole').textContent = isAdmin ? '管理员' : '普通用户';
+    $('accountMask').classList.add('show');
+    api('GET', '/api/me').then(function (r) {
+      $('acctEmail').textContent = r.email || '未绑定';
+    }).catch(function (e) { $('acctEmail').textContent = e.message; });
+  };
+  $('acctClose').onclick = function () { $('accountMask').classList.remove('show'); };
+  $('acctCopy').onclick = function () {
+    try {
+      navigator.clipboard.writeText(currentUsername);
+      $('acctCopy').textContent = '已复制';
+      setTimeout(function () { $('acctCopy').textContent = '复制账号名'; }, 1500);
+    } catch (e) { $('acctCopy').textContent = '复制失败，请手动记'; }
+  };
+  $('accountMask').addEventListener('click', function (e) {
+    if (e.target === $('accountMask')) $('accountMask').classList.remove('show');
+  });
+
+  function loadEmailNotify() {
+    api('GET', '/api/email/notify').then(function (r) {
+      $('emailNotify').checked = r.enabled;
+      $('emailNotify').disabled = !r.available;
+      $('emailNotifyState').textContent = !r.available
+        ? '等待管理员配置发信邮箱'
+        : (r.enabled ? '开启中 · ' + r.email : '已关闭');
+      var mode = r.mode || 'normal';
+      document.querySelectorAll('.mode-btn').forEach(function (b) {
+        b.classList.toggle('sel', b.getAttribute('data-mode') === mode);
+      });
+      $('modeState').textContent = '';
+    }).catch(function (e) { $('emailNotifyState').textContent = e.message; });
+  }
+  document.querySelectorAll('.mode-btn').forEach(function (b) {
+    b.onclick = function () {
+      var mode = b.getAttribute('data-mode');
+      api('POST', '/api/reminder/mode', { mode: mode }).then(function () {
+        document.querySelectorAll('.mode-btn').forEach(function (x) {
+          x.classList.toggle('sel', x === b);
+        });
+        $('modeState').textContent = '已保存';
+      }).catch(function (e) { $('modeState').textContent = e.message; });
+    };
+  });
+  $('emailNotify').onchange = function () {
+    api('POST', '/api/email/notify', { enabled: $('emailNotify').checked }).then(function () {
+      loadEmailNotify();
+    }).catch(function (e) { $('emailNotifyState').textContent = e.message; });
+  };
+  $('emailNotifyTest').onclick = function () {
+    api('POST', '/api/email/notify/test').then(function (r) {
+      $('emailNotifyState').textContent = r.message;
+    }).catch(function (e) { $('emailNotifyState').textContent = e.message; });
+  };
+
+  function setAdminCollapsed(collapsed) {
+    $('adminBody').classList.toggle('collapsed', collapsed);
+    $('adminChevron').classList.toggle('up', collapsed);
+    $('adminHint').textContent = collapsed ? '已配置 · 点开修改' : '仅管理员可见';
+  }
+  $('adminHead').onclick = function () {
+    setAdminCollapsed(!$('adminBody').classList.contains('collapsed'));
+  };
 
   function loadSmtpState() {
     api('GET', '/api/admin/smtp').then(function (r) {
@@ -781,6 +1194,7 @@
       $('smtpUser').value = r.user || '';
       $('smtpSender').value = r.sender || '';
       $('smtpState').textContent = r.configured ? '已开启邮箱验证' : '邮箱验证未开启';
+      setAdminCollapsed(!!r.configured);
     }).catch(function (e) { $('smtpError').textContent = e.message; });
   }
   $('smtpSave').onclick = function () {
@@ -796,6 +1210,7 @@
       $('smtpError').style.color = 'var(--muted)';
       $('smtpError').textContent = r.message;
       authConfig.emailVerified = true;
+      setAdminCollapsed(true);
     }).catch(function (e) { $('smtpError').style.color = ''; $('smtpError').textContent = e.message; })
       .then(function () { $('smtpSave').disabled = false; });
   };

@@ -1,0 +1,22 @@
+# 运行时生成，禁止提交
+data.db
+data.db-*
+vapid_private.pem
+
+# Python
+__pycache__/
+*.py[cod]
+
+# 本地环境
+.env
+.DS_Store
+
+# 运维内情，绝不入库
+运维私记.md
+
+# 本地快照工具（含线上地址）与快照数据
+snapshot.py
+backups/
+
+# 构建产物
+*.zip
