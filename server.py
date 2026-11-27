@@ -428,6 +428,12 @@ def get_reminder_mode(conn, user_id):
 
 
 def send_deadline_email(conn, user_id, title, body):
+    # 已下线：邮件打开率太低，提醒改走浏览器推送和微信。
+    # SMTP 配置保留，只服务「找回密码」验证码。
+    return False
+
+
+def _send_deadline_email_retired(conn, user_id, title, body):
     cfg = smtp_config(conn)
     if not smtp_ready(cfg) or not get_email_notify(conn, user_id):
         return False
@@ -616,7 +622,6 @@ def push_worker():
                 users = conn.execute(
                     'SELECT user_id FROM push_subscriptions '
                     'UNION SELECT user_id FROM settings WHERE pushplus_token <> \'\' '
-                    'UNION SELECT user_id FROM settings WHERE email_notify = 1'
                 ).fetchall()
                 for row in users:
                     user_id = row['user_id']
@@ -815,7 +820,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if path == '/api/auth/config':
                 self._json(200, {
                     'emailRequired': True,
-                    'emailVerified': smtp_ready(smtp_config(conn))
+                    # 注册不再要邮箱验证码；这个字段只影响前端要不要显示验证码输入框
+                    'emailVerified': False
                 })
                 return
             if path == '/api/admin/smtp':
@@ -871,17 +877,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     'users': users,
                 })
                 return
-            if path == '/api/email/notify':
+            if path == '/api/reminder/mode':
                 user = session_user(self, conn)
                 if not user:
                     self._json(401, {'error': '请先登录'})
                     return
-                self._json(200, {
-                    'enabled': get_email_notify(conn, user['id']),
-                    'mode': get_reminder_mode(conn, user['id']),
-                    'available': smtp_ready(smtp_config(conn)),
-                    'email': user['email']
-                })
+                self._json(200, {'mode': get_reminder_mode(conn, user['id'])})
                 return
             if path == '/api/pushplus/status':
                 user = session_user(self, conn)
@@ -1006,10 +1007,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if not is_valid_email(email):
                     self._json(400, {'error': '请填写有效的邮箱——它是找回账号的唯一方式'})
                     return
-                cfg = smtp_config(conn)
-                if smtp_ready(cfg) and not verify_email_code(conn, email, code, 'register'):
-                    self._json(400, {'error': '验证码不对或已过期，请重新获取'})
-                    return
+                # 注册不卡邮箱验证码：发信受额度、垃圾箱影响，卡在这里等于把人挡在门外。
+                # 邮箱只用于「找回密码」，发不出去也能正常注册。
                 if conn.execute('SELECT 1 FROM users WHERE email = ?', (email,)).fetchone():
                     self._json(409, {'error': '这个邮箱已经注册过了，直接登录或用另一个邮箱'})
                     return

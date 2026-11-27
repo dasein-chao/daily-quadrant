@@ -615,7 +615,7 @@
           ? '填注册时用的邮箱，收验证码后设置新密码。需要管理员已配置邮件服务。'
           : (authConfig.emailVerified
               ? '邮箱每个账号只能用一次，注册时要收一封验证码邮件。账号名随便起，这台设备会记住。收不到验证码就先游客用，之后注册能把记下的事一起并进账号。'
-              : '邮箱每个账号只能用一次，用来找回账号。管理员开启邮箱验证后，新注册要收验证码。'));
+              : '邮箱每个账号只能用一次，只用来找回密码。注册不用等验证码，填完直接进。账号名随便起，这台设备会记住。'));
     $('authError').textContent = '';
   }
   $('tabLogin').onclick = function () { setAuthMode('login'); };
@@ -750,7 +750,7 @@
     if (!isGuest) {
       loadPushState();
       loadWechatState();
-      loadEmailNotify();
+      loadReminderMode();
     }
     if (state.pendingReview && state.pendingReview.taskIds.length) setTimeout(openReview, 300);
   }
@@ -1172,19 +1172,14 @@
     if (e.target === $('accountMask')) $('accountMask').classList.remove('show');
   });
 
-  function loadEmailNotify() {
-    api('GET', '/api/email/notify').then(function (r) {
-      $('emailNotify').checked = r.enabled;
-      $('emailNotify').disabled = !r.available;
-      $('emailNotifyState').textContent = !r.available
-        ? '等待管理员配置发信邮箱'
-        : (r.enabled ? '开启中 · ' + r.email : '已关闭');
+  function loadReminderMode() {
+    api('GET', '/api/reminder/mode').then(function (r) {
       var mode = r.mode || 'normal';
       document.querySelectorAll('.mode-btn').forEach(function (b) {
         b.classList.toggle('sel', b.getAttribute('data-mode') === mode);
       });
       $('modeState').textContent = '';
-    }).catch(function (e) { $('emailNotifyState').textContent = e.message; });
+    }).catch(function () {});
   }
   document.querySelectorAll('.mode-btn').forEach(function (b) {
     b.onclick = function () {
@@ -1197,16 +1192,6 @@
       }).catch(function (e) { $('modeState').textContent = e.message; });
     };
   });
-  $('emailNotify').onchange = function () {
-    api('POST', '/api/email/notify', { enabled: $('emailNotify').checked }).then(function () {
-      loadEmailNotify();
-    }).catch(function (e) { $('emailNotifyState').textContent = e.message; });
-  };
-  $('emailNotifyTest').onclick = function () {
-    api('POST', '/api/email/notify/test').then(function (r) {
-      $('emailNotifyState').textContent = r.message;
-    }).catch(function (e) { $('emailNotifyState').textContent = e.message; });
-  };
 
   function setAdminCollapsed(collapsed) {
     $('adminBody').classList.toggle('collapsed', collapsed);
