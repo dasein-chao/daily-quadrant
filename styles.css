@@ -250,6 +250,8 @@ footer { margin-top: 24px; color: var(--faint); font-size: 12px; text-align: cen
   align-items: center; justify-content: center; padding: 0 0 3px;
   box-shadow: 0 8px 24px rgba(17,24,39,.28); z-index: 60; touch-action: manipulation; }
 .fab.hide { display: none !important; }
+/* 鼠标设备（电脑）顶部按钮本来就顺手，不需要这个球 */
+@media (hover: hover) and (pointer: fine) { .fab { display: none; } }
 
 /* 触屏上把「轻点」和「滑动」区分开，否则手一抖按钮就不响应 */
 .btn, .chip, .q-choices button, .tabs button, .pass-eye, .task-actions .btn {

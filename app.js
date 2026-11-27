@@ -848,35 +848,31 @@
     if (f) f.classList.remove('hide');
   }
   function openAddWizard() {
-    window.__addClicks = (window.__addClicks || 0) + 1;
-    window.__step = '0-进入';
+    var now = Date.now();
+    // 触屏 touchend 与 click 会各来一次，防重复打开
+    if (now - lastAddOpen < 350) return;
+    lastAddOpen = now;
     try {
-      var now = Date.now();
-      if (now - lastAddOpen < 350) { window.__step = '1-被防抖拦下'; return; }
-      lastAddOpen = now;
       draft = { title: '', deadline: '', impact: 2, urgency: 2 };
-      window.__step = '2-draft';
       $('wzInput').value = '';
       $('wzError1').textContent = '';
       $('wzError2').textContent = '';
       $('wzError3').textContent = '';
-      window.__step = '3-清空字段';
       showWizardPage(1);
-      window.__step = '4-切到第一页';
       var mask = $('addMask');
       mask.classList.add('show');
-      // 不跟 CSS 商量了，直接写死。所有关闭路径统一走 closeAdd
+      // 不依赖样式表：内联写死，避免被外层容器或规则覆盖
       mask.style.display = 'flex';
       mask.style.position = 'fixed';
       mask.style.left = '0'; mask.style.top = '0';
       mask.style.right = '0'; mask.style.bottom = '0';
       mask.style.zIndex = '9999';
-      window.__step = '5-已设display=' + mask.style.display;
       var fab = $('fabAdd');
       if (fab) fab.classList.add('hide');
       mask.scrollTop = 0;
       var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
       if (!coarse) setTimeout(function () { $('wzInput').focus(); }, 50);
+      // 兜底：输入框不在可视区里就滚进来
       setTimeout(function () {
         var el = $('wzInput');
         if (!el) return;
@@ -884,9 +880,8 @@
         var vh = window.innerHeight || document.documentElement.clientHeight || 0;
         if (r.top < 0 || r.bottom > vh) el.scrollIntoView({ block: 'center' });
       }, 300);
-      window.__step = '6-完成';
     } catch (err) {
-      window.__step = '错误: ' + (err && err.message ? err.message : String(err));
+      if (window.onerror) window.onerror('打开新增失败：' + (err && err.message || err), '', 0);
     }
   }
   (function bindAddBtn() {
@@ -1309,22 +1304,6 @@
   if (location.hash === '#add') setTimeout(function () { openAddWizard(); }, 200);
   // 右下角悬浮按钮走内联 onclick，不依赖事件绑定是否成功
   window.__openAdd = openAddWizard;
-
-  // 诊断模式：地址加 ?diag=1，页面底部实时显示脚本状态和点击次数
-  if (/[?&]diag=1/.test(location.search)) {
-    var dbar = document.createElement('div');
-    dbar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;background:#111827;' +
-      'color:#4ade80;font:12px/1.5 ui-monospace,monospace;padding:6px 10px;white-space:pre-wrap';
-    document.body.appendChild(dbar);
-    var updDiag = function () {
-      dbar.textContent = '点击=' + (window.__addClicks || 0) +
-        ' | 步骤=' + (window.__step || '-') +
-        ' | 弹窗=' + getComputedStyle($('addMask')).display +
-        ' | fab=' + getComputedStyle($('fabAdd')).display + ' | v33';
-    };
-    updDiag();
-    setInterval(updDiag, 500);
-  }
 
   // 把新增弹窗挂到 body 末尾：避免被祖先元素的 overflow / transform 影响 fixed 定位
   try { document.body.appendChild($('addMask')); } catch (e) {}
