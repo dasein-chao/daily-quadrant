@@ -24,7 +24,23 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.join(os.path.dirname(HERE), 'dq-backup')
 DATA_DIR = os.path.join(REPO, 'data')
-KEEP = 30
+KEEP = 120          # 每 2 小时一份，120 份约 10 天
+
+
+def load_env_file():
+    """账号密码优先读环境变量，其次读项目里的 .env（已在 .gitignore 里）。"""
+    path = os.path.join(HERE, '.env')
+    if not os.path.isfile(path):
+        return
+    with open(path, encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            k, v = line.split('=', 1)
+            k, v = k.strip(), v.strip().strip('"').strip("'")
+            if k and k not in os.environ:
+                os.environ[k] = v
 
 
 def sh(cmd, cwd=None):
@@ -34,12 +50,14 @@ def sh(cmd, cwd=None):
 
 def main():
     dry = '--dry-run' in sys.argv
+    load_env_file()
     user = os.environ.get('DQ_USER', '').strip()
     pwd = os.environ.get('DQ_PASS', '')
     if not user or not pwd:
-        print('缺 DQ_USER / DQ_PASS。先设环境变量，例如：')
-        print(r'  setx DQ_USER "你的管理员账号"')
-        print(r'  setx DQ_PASS "你的密码"')
+        print('缺 DQ_USER / DQ_PASS。在 daily-quadrant 目录建一个 .env 文件，写两行：')
+        print('  DQ_USER=你的管理员账号')
+        print('  DQ_PASS=你的密码')
+        print('（.env 已在 .gitignore 里，不会被提交）')
         return 2
 
     # 复用 snapshot.py 的导出逻辑
@@ -58,7 +76,7 @@ def main():
     src = os.path.join(HERE, 'backups', latest)
 
     os.makedirs(DATA_DIR, exist_ok=True)
-    stamp = datetime.datetime.now().strftime('%Y-%m-%d')
+    stamp = datetime.datetime.now().strftime('%Y-%m-%d-%H%M')
     dest = os.path.join(DATA_DIR, 'snapshot-%s.json' % stamp)
     shutil.copyfile(src, dest)
     print('写入仓库:', dest)
