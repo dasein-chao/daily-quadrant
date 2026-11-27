@@ -840,6 +840,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if path == '/api/push/key':
                 self._json(200, {'enabled': bool(VAPID_PUBLIC), 'publicKey': VAPID_PUBLIC})
                 return
+            if path == '/api/health':
+                # 只报数量，不含任何任务内容。发布前后各看一次，数据有没有被覆盖一目了然
+                u = conn.execute('SELECT COUNT(*) AS c FROM users').fetchone()['c']
+                t = 0
+                for row in conn.execute('SELECT data FROM states'):
+                    try:
+                        t += len((json.loads(row['data']) or {}).get('tasks') or [])
+                    except Exception:
+                        pass
+                self._json(200, {'ok': True, 'users': u, 'tasks': t,
+                                 'dataDir': DATA_DIR})
+                return
             if path == '/api/auth/config':
                 self._json(200, {
                     'emailRequired': True,
