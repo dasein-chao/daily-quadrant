@@ -1,6 +1,23 @@
 (function () {
   'use strict';
 
+  // 出错就把话说在页面上，别让用户对着一个没反应的按钮猜
+  window.onerror = function (msg, src, line) {
+    try {
+      var bar = document.getElementById('errBar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'errBar';
+        bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;' +
+          'background:#b91c1c;color:#fff;font:13px/1.6 system-ui;padding:8px 12px;' +
+          'white-space:pre-wrap;word-break:break-all';
+        document.body.appendChild(bar);
+      }
+      bar.textContent = '页面出错，请把这张截图发给开发：' + msg + '（第 ' + line + ' 行）';
+    } catch (e) {}
+    return false;
+  };
+
   // 3×3 九格：编号 = 重要档*3 + 紧急档 + 1，9 最高优先级
   var QUADS = {
     9: { name: '立刻解决', sub: '崩溃的前兆之一，就是相信这活非你不可（罗素）' },
@@ -822,7 +839,17 @@
       $('wzDot' + i).classList.toggle('done', i < n);
     }
   }
+  var lastAddOpen = 0;
+  function closeAdd() {
+    var m = $('addMask');
+    m.classList.remove('show');
+    m.style.display = '';
+  }
   function openAddWizard() {
+    var now = Date.now();
+    // 触屏上 touchend 和 click 会各来一次，防重复打开
+    if (now - lastAddOpen < 350) return;
+    lastAddOpen = now;
     draft = { title: '', deadline: '', impact: 2, urgency: 2 };
     $('wzInput').value = '';
     $('wzError1').textContent = '';
@@ -831,6 +858,8 @@
     showWizardPage(1);
     var mask = $('addMask');
     mask.classList.add('show');
+    // 双保险：class 没生效时直接上内联样式（关闭时由 closeAdd 清掉）
+    if (getComputedStyle(mask).display === 'none') mask.style.display = 'flex';
     mask.scrollTop = 0;
     var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
     // 触屏设备不自动聚焦：键盘一弹，可视区被压掉一半，输入框反而被顶出屏幕
@@ -844,11 +873,19 @@
       if (r.top < 0 || r.bottom > vh) el.scrollIntoView({ block: 'center' });
     }, 300);
   }
-  $('addBtn').addEventListener('click', openAddWizard);
+  (function bindAddBtn() {
+    var btn = $('addBtn');
+    if (!btn) return;
+    btn.addEventListener('click', openAddWizard);
+    btn.addEventListener('touchend', function (e) {
+      e.preventDefault();
+      openAddWizard();
+    }, { passive: false });
+  })();
   document.querySelectorAll('.chip[data-sample]').forEach(function (btn) {
     btn.onclick = function () { $('wzInput').value = btn.getAttribute('data-sample'); $('wzInput').focus(); };
   });
-  $('wzCancel1').onclick = function () { $('addMask').classList.remove('show'); };
+  $('wzCancel1').onclick = function () { closeAdd(); };
   $('wzNext1').onclick = function () {
     var raw = $('wzInput').value.trim();
     if (!raw) { $('wzError1').textContent = '随便说一句就行，比如「明天交房租」。'; return; }
@@ -916,7 +953,7 @@
     if (dup) {
       var goOn = window.confirm('「' + dup.title + '」已经有一条，' + dup.deadline + '，还没做完。\n\n真要再来一条？\n确定 = 确实有两件事\n取消 = 不重复记，回清单看那条');
       if (!goOn) {
-        $('addMask').classList.remove('show');
+        closeAdd();
         refresh();
         return;
       }
@@ -928,11 +965,11 @@
       carryCount: 0, lastCarryDate: null, history: [], doneDate: null,
       why: { impact: draft.impact, urgency: draft.urgency, effort: draft.effort }
     });
-    $('addMask').classList.remove('show');
+    closeAdd();
     refresh();
   };
   $('addMask').addEventListener('click', function (e) {
-    if (e.target === $('addMask')) $('addMask').classList.remove('show');
+    if (e.target === $('addMask')) closeAdd();
   });
 
   // 任务卡片操作
@@ -1250,8 +1287,10 @@
     }).catch(function (e) { $('smtpError').style.color = ''; $('smtpError').textContent = e.message; });
   };
 
-  $('addMask').addEventListener('click', function (e) { if (e.target === $('addMask')) $('addMask').classList.remove('show'); });
   $('reviewMask').addEventListener('click', function (e) { if (e.target === $('reviewMask')) $('reviewMask').classList.remove('show'); });
+
+  // 备用入口：地址后面加 #add 直接打开新增框。按钮点不动时用它验证是不是点击的问题
+  if (location.hash === '#add') setTimeout(function () { openAddWizard(); }, 200);
 
   setInterval(function () {
     if (!state || document.getElementById('appShell').classList.contains('hidden')) return;
