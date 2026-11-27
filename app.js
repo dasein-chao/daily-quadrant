@@ -844,6 +844,8 @@
     var m = $('addMask');
     m.classList.remove('show');
     m.style.display = '';
+    var f = $('fabAdd');
+    if (f) f.classList.remove('hide');
   }
   function openAddWizard() {
     var now = Date.now();
@@ -860,6 +862,8 @@
     mask.classList.add('show');
     // 双保险：class 没生效时直接上内联样式（关闭时由 closeAdd 清掉）
     if (getComputedStyle(mask).display === 'none') mask.style.display = 'flex';
+    var fab = $('fabAdd');
+    if (fab) fab.classList.add('hide');
     mask.scrollTop = 0;
     var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
     // 触屏设备不自动聚焦：键盘一弹，可视区被压掉一半，输入框反而被顶出屏幕
@@ -1291,6 +1295,18 @@
 
   // 备用入口：地址后面加 #add 直接打开新增框。按钮点不动时用它验证是不是点击的问题
   if (location.hash === '#add') setTimeout(function () { openAddWizard(); }, 200);
+  // 右下角悬浮按钮走内联 onclick，不依赖事件绑定是否成功
+  window.__openAdd = openAddWizard;
+
+  // 诊断模式：地址加 ?diag=1，页面底部直接显示脚本状态
+  if (/[?&]diag=1/.test(location.search)) {
+    var dbar = document.createElement('div');
+    dbar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;background:#111827;' +
+      'color:#4ade80;font:12px/1.5 ui-monospace,monospace;padding:6px 10px;white-space:pre-wrap';
+    dbar.textContent = 'JS 已执行 | addBtn=' + (!!$('addBtn')) + ' | mask=' + (!!$('addMask')) +
+      ' | fab=' + (!!$('fabAdd')) + ' | 版本 v31';
+    document.body.appendChild(dbar);
+  }
 
   setInterval(function () {
     if (!state || document.getElementById('appShell').classList.contains('hidden')) return;
