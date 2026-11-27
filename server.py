@@ -76,12 +76,16 @@ def migrate_legacy_db():
             pass
 
 
-def backup_db(pool=3):
-    """每天留一份副本，误删误覆盖还能捞回来。"""
+def backup_db(keep_hours=168):
+    """每小时留一份副本，保留 7 天（168 份）。
+
+    为什么是小时级：任务清单能接受最坏丢一小时。再密就是在拿磁盘和 IO 换
+    一件几乎不会发生的事；再稀，丢的可能就是今天下午刚记的东西。
+    """
     if not os.path.exists(DB_PATH):
         return
     try:
-        stamp = datetime.date.today().isoformat()
+        stamp = datetime.datetime.now().strftime('%Y-%m-%dT%H')
         dest = os.path.join(DATA_DIR, 'backup-' + stamp + '.db')
         if not os.path.exists(dest):
             shutil.copy2(DB_PATH, dest)
@@ -89,7 +93,7 @@ def backup_db(pool=3):
             f for f in os.listdir(DATA_DIR)
             if f.startswith('backup-') and f.endswith('.db')
         )
-        for f in olds[:-pool]:
+        for f in olds[:-keep_hours]:
             os.remove(os.path.join(DATA_DIR, f))
     except Exception:
         pass
@@ -689,9 +693,9 @@ def push_worker():
         time.sleep(60)
 
 
-def daily_backup_worker():
-    """每小时检查一次：今天还没有备份就备一份。
-    只在启动时备份远远不够——服务不重启，就永远只有启动那天的库。"""
+def hourly_backup_worker():
+    """每小时备一份。只在启动时备份远远不够——服务不重启就永远只有启动那天的库。
+    同一小时内重复调用不会重复写，backup_db 自己判断文件是否已存在。"""
     while True:
         try:
             backup_db()
@@ -806,6 +810,44 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     'configured': smtp_ready(cfg),
                     'host': cfg['host'], 'port': cfg['port'],
                     'user': cfg['user'], 'sender': cfg['sender']
+                })
+                return
+            if path == '/api/admin/export-all':
+                # 管理员全量导出：给备份用。故意不含密码哈希与盐。
+                # 恢复时账号还在、数据还在，密码让用户走「找回密码」重设。
+                user = session_user(self, conn)
+                if not user:
+                    self._json(401, {'error': '请先登录'})
+                    return
+                if not user['is_admin']:
+                    self._json(403, {'error': '只有管理员能导出全部数据'})
+                    return
+                rows = conn.execute(
+                    'SELECT u.id AS id, u.username AS username, u.email AS email, '
+                    'u.is_admin AS is_admin, u.created_at AS created_at, s.data AS data '
+                    'FROM users u LEFT JOIN states s ON s.user_id = u.id ORDER BY u.id'
+                ).fetchall()
+                users = []
+                for r in rows:
+                    state = None
+                    if r['data']:
+                        try:
+                            state = json.loads(r['data'])
+                        except (TypeError, ValueError):
+                            state = None
+                    users.append({
+                        'id': r['id'],
+                        'username': r['username'],
+                        'email': r['email'],
+                        'isAdmin': bool(r['is_admin']),
+                        'createdAt': r['created_at'],
+                        'state': state,
+                    })
+                self._json(200, {
+                    'exportedAt': datetime.datetime.now().isoformat(timespec='seconds'),
+                    'userCount': len(users),
+                    'passwordHashIncluded': False,
+                    'users': users,
                 })
                 return
             if path == '/api/email/notify':
@@ -1204,7 +1246,7 @@ if __name__ == '__main__':
     init_db()
     backup_db()
     threading.Thread(target=push_worker, daemon=True).start()
-    threading.Thread(target=daily_backup_worker, daemon=True).start()
+    threading.Thread(target=hourly_backup_worker, daemon=True).start()
     print('daily-quadrant listening on 0.0.0.0:' + str(PORT) +
           ' (webpush=' + str(bool(VAPID_PUBLIC)) + ', pushplus=' + str(bool(PUSHPLUS_API)) + ')', flush=True)
     Server(('0.0.0.0', PORT), Handler).serve_forever()
