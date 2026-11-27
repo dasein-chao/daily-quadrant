@@ -843,40 +843,51 @@
   function closeAdd() {
     var m = $('addMask');
     m.classList.remove('show');
-    m.style.display = '';
+    m.style.display = 'none';
     var f = $('fabAdd');
     if (f) f.classList.remove('hide');
   }
   function openAddWizard() {
     window.__addClicks = (window.__addClicks || 0) + 1;
-    var now = Date.now();
-    // 触屏上 touchend 和 click 会各来一次，防重复打开
-    if (now - lastAddOpen < 350) return;
-    lastAddOpen = now;
-    draft = { title: '', deadline: '', impact: 2, urgency: 2 };
-    $('wzInput').value = '';
-    $('wzError1').textContent = '';
-    $('wzError2').textContent = '';
-    $('wzError3').textContent = '';
-    showWizardPage(1);
-    var mask = $('addMask');
-    mask.classList.add('show');
-    // 双保险：class 没生效时直接上内联样式（关闭时由 closeAdd 清掉）
-    if (getComputedStyle(mask).display === 'none') mask.style.display = 'flex';
-    var fab = $('fabAdd');
-    if (fab) fab.classList.add('hide');
-    mask.scrollTop = 0;
-    var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
-    // 触屏设备不自动聚焦：键盘一弹，可视区被压掉一半，输入框反而被顶出屏幕
-    if (!coarse) setTimeout(function () { $('wzInput').focus(); }, 50);
-    // 兜底：不管什么设备，只要输入框不在可视区里，就滚进来
-    setTimeout(function () {
-      var el = $('wzInput');
-      if (!el) return;
-      var r = el.getBoundingClientRect();
-      var vh = window.innerHeight || document.documentElement.clientHeight || 0;
-      if (r.top < 0 || r.bottom > vh) el.scrollIntoView({ block: 'center' });
-    }, 300);
+    window.__step = '0-进入';
+    try {
+      var now = Date.now();
+      if (now - lastAddOpen < 350) { window.__step = '1-被防抖拦下'; return; }
+      lastAddOpen = now;
+      draft = { title: '', deadline: '', impact: 2, urgency: 2 };
+      window.__step = '2-draft';
+      $('wzInput').value = '';
+      $('wzError1').textContent = '';
+      $('wzError2').textContent = '';
+      $('wzError3').textContent = '';
+      window.__step = '3-清空字段';
+      showWizardPage(1);
+      window.__step = '4-切到第一页';
+      var mask = $('addMask');
+      mask.classList.add('show');
+      // 不跟 CSS 商量了，直接写死。所有关闭路径统一走 closeAdd
+      mask.style.display = 'flex';
+      mask.style.position = 'fixed';
+      mask.style.left = '0'; mask.style.top = '0';
+      mask.style.right = '0'; mask.style.bottom = '0';
+      mask.style.zIndex = '9999';
+      window.__step = '5-已设display=' + mask.style.display;
+      var fab = $('fabAdd');
+      if (fab) fab.classList.add('hide');
+      mask.scrollTop = 0;
+      var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      if (!coarse) setTimeout(function () { $('wzInput').focus(); }, 50);
+      setTimeout(function () {
+        var el = $('wzInput');
+        if (!el) return;
+        var r = el.getBoundingClientRect();
+        var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+        if (r.top < 0 || r.bottom > vh) el.scrollIntoView({ block: 'center' });
+      }, 300);
+      window.__step = '6-完成';
+    } catch (err) {
+      window.__step = '错误: ' + (err && err.message ? err.message : String(err));
+    }
   }
   (function bindAddBtn() {
     var btn = $('addBtn');
@@ -1306,13 +1317,17 @@
       'color:#4ade80;font:12px/1.5 ui-monospace,monospace;padding:6px 10px;white-space:pre-wrap';
     document.body.appendChild(dbar);
     var updDiag = function () {
-      dbar.textContent = 'JS已执行 | 点击次数=' + (window.__addClicks || 0) +
+      dbar.textContent = '点击=' + (window.__addClicks || 0) +
+        ' | 步骤=' + (window.__step || '-') +
         ' | 弹窗=' + getComputedStyle($('addMask')).display +
-        ' | fab=' + getComputedStyle($('fabAdd')).display + ' | v32';
+        ' | fab=' + getComputedStyle($('fabAdd')).display + ' | v33';
     };
     updDiag();
     setInterval(updDiag, 500);
   }
+
+  // 把新增弹窗挂到 body 末尾：避免被祖先元素的 overflow / transform 影响 fixed 定位
+  try { document.body.appendChild($('addMask')); } catch (e) {}
 
   setInterval(function () {
     if (!state || document.getElementById('appShell').classList.contains('hidden')) return;
