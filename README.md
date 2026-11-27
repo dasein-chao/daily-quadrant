@@ -81,6 +81,8 @@ python3 server.py
 
 数据默认放在 `~/.daily-quadrant/`（`DQ_DATA_DIR` 可覆盖），首次启动自动建 `data.db` 和 `vapid_private.pem`。**数据不在代码目录里**——容器化部署会替换整个代码目录，放里面等于每次清库。
 
+**数据不只活在容器里**：`daily-sync.py` 每天把线上全部用户与任务拉到本机，再推进私有仓库 `daily-quadrant-data`。容器整个没了，最多丢一天，而且能一键写回（`restore.py`）。凭据走环境变量 `DQ_USER` / `DQ_PASS`，不落盘。
+
 **发布会不会清数据**：不会。发布做的是「复用原沙箱，用上传的代码目录覆盖线上代码目录」，不重建整台机器。只要数据不在上传目录内，改代码随便发。想确认就调 `GET /api/health`，发布前后对比 `users`、`tasks` 两个数字。
 
 需要 Python 3 和 openssl（用来生成推送密钥）。不需要 `pip install`。
