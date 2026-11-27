@@ -614,7 +614,7 @@
       : (mode === 'reset'
           ? '填注册时用的邮箱，收验证码后设置新密码。需要管理员已配置邮件服务。'
           : (authConfig.emailVerified
-              ? '邮箱每个账号只能用一次，注册时要收一封验证码邮件。账号名随便起，这台设备会记住。'
+              ? '邮箱每个账号只能用一次，注册时要收一封验证码邮件。账号名随便起，这台设备会记住。收不到验证码就先游客用，之后注册能把记下的事一起并进账号。'
               : '邮箱每个账号只能用一次，用来找回账号。管理员开启邮箱验证后，新注册要收验证码。'));
     $('authError').textContent = '';
   }
@@ -663,15 +663,6 @@
       $('authSubmit').disabled = true;
       api('POST', '/api/password/reset', { email: email, code: code, password: password })
         .then(function (r) {
-          $('guestBtn').onclick = function () { startGuest(); };
-  $('guestRegisterBtn').onclick = function () {
-    isGuest = false;
-    $('appShell').classList.add('hidden');
-    $('authScreen').classList.remove('hidden');
-    setAuthMode('register');
-  };
-
-  setAuthMode('login');
           $('authUser').value = '';
           $('authPass').value = '';
           $('authEmail').value = '';
@@ -707,7 +698,10 @@
           $('authError').textContent = e.message + ' 如果是你之前注册的，切到「登录」直接进。';
           return;
         }
-        $('authError').textContent = e.message;
+        // 邮件服务没配好、验证码发不出时，注册就走不通——给一条不堵死的路
+        $('authError').textContent = authMode === 'register'
+          ? e.message + '（注册暂时走不通的话，先点下面「先不注册，游客用一下」，之后注册能把这几件事并进账号。）'
+          : e.message;
       })
       .then(function () { $('authSubmit').disabled = false; });
   };
@@ -729,6 +723,11 @@
 
   $('logoutBtn').onclick = function () {
     if (isGuest) {
+      var g = readGuestState();
+      var n = g && Array.isArray(g.tasks) ? g.tasks.length : 0;
+      // 退出就把本机游客数据清掉，必须问一声，别让人一键清空
+      if (!confirm((n ? '这台设备上还存着 ' + n + ' 件事。' : '')
+          + '退出会清掉游客数据，清掉就找不回来。\n\n想留着就先「注册长期用」，注册时能并进账号。确定退出吗？')) return;
       try { localStorage.removeItem(GUEST_FLAG); localStorage.removeItem(GUEST_KEY); } catch (e) {}
       location.reload();
       return;
@@ -766,10 +765,41 @@
     api('GET', '/api/state').then(function (r) {
       state = normalizeState(r.state);
       enterApp();
+      mergeGuestState(username || '这个账号');
     }).catch(function (e) {
       alert('读取任务失败：' + e.message);
     });
   }
+  // 游客记过的事，注册/登录后并进账号——不能让用户白记一遍
+  function mergeGuestState(username) {
+    var g = readGuestState();
+    if (!g || !Array.isArray(g.tasks) || !g.tasks.length) return;
+    var guestTasks = g.tasks.filter(function (t) { return t && t.title; }).map(function (t) {
+      var copy = JSON.parse(JSON.stringify(t));
+      copy.id = uid();                       // 游客 id 可能和账号里的撞，全部换新
+      if (!Array.isArray(copy.history)) copy.history = [];
+      return copy;
+    });
+    if (!guestTasks.length) { try { localStorage.removeItem(GUEST_KEY); } catch (e) {} return; }
+    var n = guestTasks.length;
+    var hadTasks = state.tasks.length > 0;
+    if (hadTasks) {
+      var ok = confirm('这台设备上还有 ' + n + ' 件游客时记的事。\n\n并进「' + username + '」账号吗？并进去之后换手机也能看到。');
+      if (!ok) return;
+    }
+    state.tasks = state.tasks.concat(guestTasks);
+    state.lastOpenDate = todayStr();
+    try { localStorage.removeItem(GUEST_KEY); } catch (e) {}
+    rebuildReminders();
+    render();
+    persist();
+    setTimeout(function () {
+      alert(hadTasks
+        ? '已并进账号：' + n + ' 件，现在一共 ' + state.tasks.length + ' 件。'
+        : '这台设备上的 ' + n + ' 件事已经放进账号了，换手机登录也能看到。');
+    }, 120);
+  }
+
   function startGuest() {
     isGuest = true;
     try { localStorage.setItem(GUEST_FLAG, '1'); } catch (e) {}
