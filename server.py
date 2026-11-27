@@ -88,7 +88,19 @@ def backup_db(keep_hours=168):
         stamp = datetime.datetime.now().strftime('%Y-%m-%dT%H')
         dest = os.path.join(DATA_DIR, 'backup-' + stamp + '.db')
         if not os.path.exists(dest):
-            shutil.copy2(DB_PATH, dest)
+            # 用 SQLite 的在线备份接口，不要直接复制文件。
+            # 有人正在写的时候 copy2 会复制出一个半截的库，打开就报错——
+            # 这种备份平时看不出来，真出事才发现是废的。
+            src = sqlite3.connect(DB_PATH, timeout=10)
+            try:
+                dst = sqlite3.connect(dest)
+                try:
+                    with dst:
+                        src.backup(dst)
+                finally:
+                    dst.close()
+            finally:
+                src.close()
         olds = sorted(
             f for f in os.listdir(DATA_DIR)
             if f.startswith('backup-') and f.endswith('.db')
@@ -102,11 +114,20 @@ def backup_db(keep_hours=168):
 def connect():
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
+    # 忙等而不是立刻报错：多用户同时写时排队，别让用户看到「数据库被锁」
+    conn.execute('PRAGMA busy_timeout=10000')
     return conn
 
 
 def init_db():
     with closing(connect()) as conn:
+        # WAL：读不阻塞写，写不阻塞读。多人同时打开时不会互相卡住。
+        # 这是文件级持久设置，设一次就一直生效。
+        try:
+            conn.execute('PRAGMA journal_mode=WAL')
+            conn.execute('PRAGMA synchronous=NORMAL')
+        except sqlite3.Error:
+            pass
         with conn:
             conn.execute('''CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
