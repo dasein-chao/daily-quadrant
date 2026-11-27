@@ -822,16 +822,29 @@
       $('wzDot' + i).classList.toggle('done', i < n);
     }
   }
-  $('addBtn').onclick = function () {
+  function openAddWizard() {
     draft = { title: '', deadline: '', impact: 2, urgency: 2 };
     $('wzInput').value = '';
     $('wzError1').textContent = '';
     $('wzError2').textContent = '';
     $('wzError3').textContent = '';
     showWizardPage(1);
-    $('addMask').classList.add('show');
-    setTimeout(function () { $('wzInput').focus(); }, 50);
-  };
+    var mask = $('addMask');
+    mask.classList.add('show');
+    mask.scrollTop = 0;
+    var coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    // 触屏设备不自动聚焦：键盘一弹，可视区被压掉一半，输入框反而被顶出屏幕
+    if (!coarse) setTimeout(function () { $('wzInput').focus(); }, 50);
+    // 兜底：不管什么设备，只要输入框不在可视区里，就滚进来
+    setTimeout(function () {
+      var el = $('wzInput');
+      if (!el) return;
+      var r = el.getBoundingClientRect();
+      var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+      if (r.top < 0 || r.bottom > vh) el.scrollIntoView({ block: 'center' });
+    }, 300);
+  }
+  $('addBtn').addEventListener('click', openAddWizard);
   document.querySelectorAll('.chip[data-sample]').forEach(function (btn) {
     btn.onclick = function () { $('wzInput').value = btn.getAttribute('data-sample'); $('wzInput').focus(); };
   });

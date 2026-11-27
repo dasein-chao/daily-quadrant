@@ -395,7 +395,8 @@ footer { margin-top: 24px; color: var(--faint); font-size: 12px; text-align: cen
   .focus-item .btn.small, .done-item .btn.small, .task-actions .btn.small { min-height: 44px; }
   .badge { font-size: 12px; }
   .modal { padding: 20px 16px; max-height: 92vh; }
-  .mask { padding: 10px; }
+  /* 平板/手机：弹窗从顶部排，遮罩自己可滚。居中排版在内容超高时会把顶部（输入框）裁到屏幕外 */
+  .mask { padding: 10px; align-items: flex-start; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .focus-item { gap: 9px; }
   .focus-num { width: 30px; height: 30px; }
   .task-actions { gap: 8px; }
