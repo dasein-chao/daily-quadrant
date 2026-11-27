@@ -848,6 +848,7 @@
     if (f) f.classList.remove('hide');
   }
   function openAddWizard() {
+    window.__addClicks = (window.__addClicks || 0) + 1;
     var now = Date.now();
     // 触屏上 touchend 和 click 会各来一次，防重复打开
     if (now - lastAddOpen < 350) return;
@@ -1298,14 +1299,19 @@
   // 右下角悬浮按钮走内联 onclick，不依赖事件绑定是否成功
   window.__openAdd = openAddWizard;
 
-  // 诊断模式：地址加 ?diag=1，页面底部直接显示脚本状态
+  // 诊断模式：地址加 ?diag=1，页面底部实时显示脚本状态和点击次数
   if (/[?&]diag=1/.test(location.search)) {
     var dbar = document.createElement('div');
     dbar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:99998;background:#111827;' +
       'color:#4ade80;font:12px/1.5 ui-monospace,monospace;padding:6px 10px;white-space:pre-wrap';
-    dbar.textContent = 'JS 已执行 | addBtn=' + (!!$('addBtn')) + ' | mask=' + (!!$('addMask')) +
-      ' | fab=' + (!!$('fabAdd')) + ' | 版本 v31';
     document.body.appendChild(dbar);
+    var updDiag = function () {
+      dbar.textContent = 'JS已执行 | 点击次数=' + (window.__addClicks || 0) +
+        ' | 弹窗=' + getComputedStyle($('addMask')).display +
+        ' | fab=' + getComputedStyle($('fabAdd')).display + ' | v32';
+    };
+    updDiag();
+    setInterval(updDiag, 500);
   }
 
   setInterval(function () {
