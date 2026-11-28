@@ -397,28 +397,66 @@
 
   // 每日一句：同一天看到的是同一条，点「换一句」往后翻，翻到哪儿当天记住
   var QUOTE_KEY = 'dq_quote_idx';
+  // 长句缩字号，免得一条占掉半屏；短句可以放松一点
+  function quoteFontFor(text) {
+    var n = text.length;
+    if (n > 72) return '14px';
+    if (n > 52) return '14.5px';
+    if (n < 16) return '17px';
+    return '15px';
+  }
   function showQuote(idx) {
     var list = window.QUOTES || [];
     if (!list.length) return;
-    var q = list[((idx % list.length) + list.length) % list.length];
-    $('quoteText').textContent = q.t;
+    var i = ((idx % list.length) + list.length) % list.length;
+    var q = list[i];
+    var el = $('quoteText');
+    el.textContent = q.t;
+    el.style.fontSize = quoteFontFor(q.t);
     $('quoteFrom').textContent = q.a + (q.s ? ' · ' + q.s : '');
     $('quoteCard').classList.remove('hidden');
-    $('quoteNext').onclick = function () {
-      var next = ((idx + 1) % list.length + list.length) % list.length;
-      try { localStorage.setItem(QUOTE_KEY, JSON.stringify({ date: todayStr(), i: next })); } catch (e) {}
-      showQuote(next);
+    function go(next) {
+      var j = ((next % list.length) + list.length) % list.length;
+      try { localStorage.setItem(QUOTE_KEY, JSON.stringify({ date: todayStr(), i: j })); } catch (e) {}
+      showQuote(j);
+    }
+    // 同一个人的句子连着出现，翻着没意思，跳到下一个作者
+    function nextOtherAuthor() {
+      for (var k = 1; k <= 12; k++) {
+        var c = (i + k) % list.length;
+        if (list[c].a !== q.a) return c;
+      }
+      return i + 1;
+    }
+    $('quoteNext').onclick = function (e) {
+      if (e) e.stopPropagation();
+      go(nextOtherAuthor());
     };
+    // 点卡片正文也能换一句，可点面积大很多，手机上不用瞄那个小字
+    el.onclick = function () { go(nextOtherAuthor()); };
+    el.title = '点一下换一句';
+  }
+  // 每天取的位置：用「黄金比例步长」在库里跳着走。
+  // 好处是前 len 天恰好把整个库走一遍，不会出现隔几天撞同一句；
+  // 普通哈希对只差一位的日期串低位扎堆，实测 18 天就撞 3 次。
+  function quoteIndexFor(dateStr, len) {
+    if (!len) return 0;
+    function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+    var step = Math.floor(len * 0.618) | 1;
+    while (step > 1 && gcd(step, len) !== 1) step--;
+    var p = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+    var day = p
+      ? Math.floor(Date.UTC(+p[1], +p[2] - 1, +p[3]) / 86400000)
+      : Math.floor(Date.now() / 86400000);
+    return ((day * step) % len + len) % len;
   }
   function renderQuote() {
     var list = window.QUOTES || [];
     if (!list.length) return;
-    var d = new Date();
-    var seed = d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate();
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem(QUOTE_KEY) || 'null'); } catch (e) {}
-    var idx = (saved && saved.date === todayStr() && typeof saved.i === 'number')
-      ? saved.i : (seed % list.length);
+    var idx = (saved && saved.date === todayStr() && typeof saved.i === 'number' && saved.i < list.length)
+      ? saved.i : quoteIndexFor(todayStr(), list.length);
     showQuote(idx);
   }
 
@@ -942,6 +980,7 @@
     $('wzTitle').value = draft.title;
     $('wzDatePreview').textContent = window.Capture.friendlyDate(draft.deadline, draft.time);
     $('wzDate').value = draft.deadline;
+    $('wzTime').value = draft.time || '';
     if (parsed.shifted) {
       $('wzError2').textContent = '这个点今天过了，我挪到明天 ' + (parsed.time || '') + '。不对就自己改。';
       $('wzError2').style.color = '#92400e';
@@ -952,6 +991,14 @@
     }
     showWizardPage(2);
   };
+  // 改了日期或时间，上面那句「什么时候」跟着变，否则看到的是旧结论
+  function refreshWzPreview() {
+    if (!$('wzDate').value) return;
+    $('wzDatePreview').textContent = window.Capture.friendlyDate($('wzDate').value, $('wzTime').value || '');
+    $('wzError2').textContent = '';
+  }
+  $('wzDate').addEventListener('change', refreshWzPreview);
+  $('wzTime').addEventListener('change', refreshWzPreview);
   $('wzBack2').onclick = function () { showWizardPage(1); };
   $('wzNext2').onclick = function () {
     var name = $('wzTitle').value.trim();
@@ -960,6 +1007,7 @@
     if (diffDays(todayStr(), $('wzDate').value) < 0) { $('wzError2').textContent = '日期不能早于今天。'; return; }
     draft.title = name;
     draft.deadline = $('wzDate').value;
+    draft.time = $('wzTime').value || '';
     showWizardPage(3);
     updateWizardResult();
   };

@@ -245,7 +245,7 @@ footer { margin-top: 24px; color: var(--faint); font-size: 12px; text-align: cen
   background: #fffdf7; border: 1px solid #f1e7d0; border-left: 3px solid #d9a441;
   border-radius: 12px; padding: 13px 16px; margin-bottom: 14px; }
 .quote-tag { font-size: 11px; letter-spacing: .14em; color: #a16207; font-weight: 600; }
-.quote-text { margin: 0; font-size: 15px; line-height: 1.85; color: #3f3a30; }
+.quote-text { margin: 0; font-size: 15px; line-height: 1.85; color: #3f3a30; cursor: pointer; }
 .quote-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .quote-from { font-size: 12px; color: #8a7f6a; }
 .quote-next { border: 0; background: transparent; color: #a16207; font-size: 12px;
@@ -275,7 +275,7 @@ footer { margin-top: 24px; color: var(--faint); font-size: 12px; text-align: cen
 .modal .desc { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
 .field { margin-bottom: 13px; }
 .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-.field input[type=text], .field input[type=password], .field input[type=date], .field select, .field textarea {
+.field input[type=text], .field input[type=password], .field input[type=date], .field input[type=time], .field select, .field textarea {
   width: 100%; font: inherit; padding: 10px 11px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--text);
 }
 .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
