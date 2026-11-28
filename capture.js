@@ -38,9 +38,14 @@
     var cuts = [];
     var lower = text;
 
-    function mark(m) {
+    function mark(m, keep) {
       if (!m) return;
-      cuts.push({ start: m.index, end: m.index + m[0].length });
+      cuts.push({ start: m.index, end: m.index + m[0].length, keep: !!keep });
+    }
+    // 时间词后面紧跟「的」，它是定语不是时间状语：
+    // 「今早的感悟」「明天的会」删掉时间词，句子就断了。取值但保留原文。
+    function attributive(m) {
+      return text.charAt(m.index + m[0].length) === '的';
     }
     // 合并重叠区间，避免倒序删除时索引错位
     function mergeCuts() {
@@ -51,6 +56,7 @@
         var last = out[out.length - 1];
         if (sorted[j].start <= last.end) {
           last.end = Math.max(last.end, sorted[j].end);
+          last.keep = last.keep || sorted[j].keep;   // 只要有一段要保留，整段都别删
         } else {
           out.push(sorted[j]);
         }
@@ -73,7 +79,7 @@
         d.setDate(d.getDate() + relList[i].n);
         date = d;
         relHit = true;
-        mark(m);
+        mark(m, attributive(m));
         break;
       }
     }
@@ -177,7 +183,7 @@
     var mPeriod = lower.match(/(凌晨|清晨|早[上晨]|上午|中午|下午|傍晚|晚上|夜间|夜里)/);
     if (mPeriod) {
       period = mPeriod[1];
-      mark(mPeriod);
+      mark(mPeriod, attributive(mPeriod));
     }
     // 「今晚」「明早」这类词已在日期步骤被吃掉，需要从中补回时段
     if (!period) {
@@ -268,6 +274,7 @@
     merged.sort(function (a, b) { return b.start - a.start; });
     var title = text;
     for (var c = 0; c < merged.length; c++) {
+      if (merged[c].keep) continue;
       title = title.slice(0, merged[c].start) + ' ' + title.slice(merged[c].end);
     }
 
@@ -281,6 +288,12 @@
     title = title.replace(/^[的了在]\s*/, '').replace(/\s+[的了]$/, '').trim();
     title = title.replace(/^[，,。、：:\s]+|[，,。、：:\s]+$/g, '');
     title = title.replace(/^要(?=\S)/, '').trim();
+    title = title.replace(/^的(?=\S)/, '').trim();
+
+    // 删时间删出了残句（"把的""在的"这种），退回原句——给一个读不通的任务名比不给更糟
+    if (/[把在和对给说让被从向于]\s*的/.test(title) && title.length < text.length) {
+      title = text;
+    }
 
     // 整句都是时间时，不要把时间当任务名，留空让用户补
     if (!title) title = '';

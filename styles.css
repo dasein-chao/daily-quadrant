@@ -240,6 +240,19 @@ footer { margin-top: 24px; color: var(--faint); font-size: 12px; text-align: cen
 .push-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; }
 
 /* Modal */
+/* 每日一句：像一条简讯，不抢焦点但看得见 */
+.quote { display: flex; flex-direction: column; gap: 6px;
+  background: #fffdf7; border: 1px solid #f1e7d0; border-left: 3px solid #d9a441;
+  border-radius: 12px; padding: 13px 16px; margin-bottom: 14px; }
+.quote-tag { font-size: 11px; letter-spacing: .14em; color: #a16207; font-weight: 600; }
+.quote-text { margin: 0; font-size: 15px; line-height: 1.85; color: #3f3a30; }
+.quote-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.quote-from { font-size: 12px; color: #8a7f6a; }
+.quote-next { border: 0; background: transparent; color: #a16207; font-size: 12px;
+  padding: 4px 6px; cursor: pointer; font-family: inherit; touch-action: manipulation; }
+.quote-next:hover { text-decoration: underline; }
+.quote.hidden { display: none; }
+
 .mask { position: fixed; inset: 0; background: rgba(17,24,39,.45); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 50; }
 .mask.show { display: flex; }
 

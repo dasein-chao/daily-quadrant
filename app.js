@@ -395,6 +395,33 @@
     }).join('');
   }
 
+  // 每日一句：同一天看到的是同一条，点「换一句」往后翻，翻到哪儿当天记住
+  var QUOTE_KEY = 'dq_quote_idx';
+  function showQuote(idx) {
+    var list = window.QUOTES || [];
+    if (!list.length) return;
+    var q = list[((idx % list.length) + list.length) % list.length];
+    $('quoteText').textContent = q.t;
+    $('quoteFrom').textContent = q.a + (q.s ? ' · ' + q.s : '');
+    $('quoteCard').classList.remove('hidden');
+    $('quoteNext').onclick = function () {
+      var next = ((idx + 1) % list.length + list.length) % list.length;
+      try { localStorage.setItem(QUOTE_KEY, JSON.stringify({ date: todayStr(), i: next })); } catch (e) {}
+      showQuote(next);
+    };
+  }
+  function renderQuote() {
+    var list = window.QUOTES || [];
+    if (!list.length) return;
+    var d = new Date();
+    var seed = d.getFullYear() * 372 + (d.getMonth() + 1) * 31 + d.getDate();
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(QUOTE_KEY) || 'null'); } catch (e) {}
+    var idx = (saved && saved.date === todayStr() && typeof saved.i === 'number')
+      ? saved.i : (seed % list.length);
+    showQuote(idx);
+  }
+
   function render() {
     var today = todayStr();
     var week = ['日', '一', '二', '三', '四', '五', '六'][new Date().getDay()];
@@ -763,6 +790,7 @@
     rollover(loadedDate);
     rebuildReminders();
     render();
+    renderQuote();
     persist();
     if (!isGuest) {
       loadPushState();
