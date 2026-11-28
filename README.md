@@ -143,6 +143,16 @@ python3 server.py
 | `sw.js` | Service Worker，处理浏览器通知 |
 | `manifest.webmanifest` / `icon.svg` | PWA 配置与图标 |
 | `CHANGELOG.md` | 版本记录，含每次的取舍理由 |
-| `.gitignore` | 排除 `data.db`、`vapid_private.pem`、`__pycache__` |
+| `sync-check.py` | 一键核对：工作区是否干净、远程是否真收到、线上跑的是哪一版 |
+| `docs/` | 开发准则、产品原则、协作经验。规范跟代码放一起，不散落在本机各处 |
+| `.gitignore` | 排除 `data.db`、`vapid_private.pem`、`.env`、`__pycache__` |
 
 后两个是运行时生成的私密文件，**永远不要提交**。
+
+### 改完代码的固定动作
+
+```bash
+python sync-check.py --push
+```
+
+它做三件事，缺一件就报出来：有没有没提交的改动、本地和远程的提交号一不一样、线上跑的是不是这一版。三项全对上才算改完。**只在本机改、没推上去，等于没写** —— 机器坏一次就全没了。
