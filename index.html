@@ -272,7 +272,7 @@
     <h3>提醒设置</h3>
     <p class="desc">提醒强度：再重要的事，也可以不响铃。</p>
     <div class="mode-row">
-      <button class="mode-btn" data-mode="quiet"><b>安静</b><span>只发邮件，不弹通知</span></button>
+      <button class="mode-btn" data-mode="quiet"><b>安静</b><span>只进列表，不弹通知</span></button>
       <button class="mode-btn" data-mode="normal"><b>普通</b><span>静默通知，不响铃</span></button>
       <button class="mode-btn" data-mode="force"><b>强制</b><span>响铃提醒，怕漏才用</span></button>
     </div>
@@ -281,39 +281,33 @@
     <p class="desc" style="margin-top:14px">浏览器推送：点「开启主动提醒」授权后可收到静默或响铃通知。</p>
     <p class="desc" style="margin-top:6px">邮件不发日常提醒——它只在「找回密码」时用一次。提醒只走浏览器推送和下面的微信。</p>
     <div class="divider"></div>
-    <p class="desc">微信提醒（可选）：已配置 PushPlus 的，把 token 粘到下面。</p>
+    <p class="desc">微信提醒（可选，最稳的那条）：去 PushPlus 用微信扫码登录，关注它的公众号，把 token 粘到下面。</p>
     <div class="wechat-row">
       <input type="password" id="wxToken" placeholder="pushplus token（可选）" autocomplete="off" maxlength="200">
       <select id="wxChannel">
         <option value="wechat">微信公众号</option>
-        <option value="clawbot">微信 ClawBot</option>
-        <option value="app">PushPlus App</option>
-        <option value="mail">邮件</option>
       </select>
       <button class="btn" id="wxSave">保存</button>
       <button class="btn small" id="wxTest">发送测试</button>
     </div>
+    <p class="desc" style="margin-top:6px">渠道只有微信公众号一个：关注「pushplus推送加」就能收，不用装 App、不用配机器人。</p>
     <div class="error" id="wxError"></div>
     <div class="divider"></div>
-<h3 class="rem-sub">怎么开主动提醒</h3>
+    <h3 class="rem-sub">怎么开主动提醒</h3>
     <div>
       <div class="howto-step">
         <b>第一步 · 选提醒强度</b>
-        <p>往下滑到「提醒设置」，三选一：安静（只发邮件）、普通（静默通知）、强制（响铃）。再重要的事也能选安静。</p>
+        <p>上面三选一：安静（只进列表，完全不打扰）、普通（静默通知）、强制（响铃）。再重要的事也能选安静。</p>
       </div>
       <div class="howto-step">
-        <b>第二步 · 确认邮件能到</b>
-        <p>「提醒设置」里点「发一封测试」，去邮箱收。收不到就看红字提示，多半是 SMTP 地址或授权码没填对。</p>
-        <p class="howto-note">管理员还没配发信邮箱？先找管理员。管理员在页面底部「站点设置」里配。</p>
+        <b>第二步 · 开手机通知</b>
+        <p>iPhone：先点浏览器「分享」→「添加到主屏幕」，再从主屏幕图标打开，点「开启主动提醒」授权。</p>
+        <p>安卓：直接点「开启主动提醒」授权。微信内置浏览器和部分手机自带浏览器收不到，换 Chrome，或者用下面的微信提醒。</p>
       </div>
       <div class="howto-step">
-        <b>第三步 · 想要手机通知（可选）</b>
-        <p>iPhone：先点浏览器底部「分享」→「添加到主屏幕」，再从主屏幕图标打开，点「今日提醒」栏的「开启主动提醒」授权。</p>
-        <p>安卓：直接点「开启主动提醒」授权。部分国内浏览器收不到，邮件渠道更稳。</p>
-      </div>
-      <div class="howto-step">
-        <b>微信提醒（可选）</b>
-        <p>需要在 PushPlus 官网完成实名认证拿到 token，然后粘贴到「提醒设置」最下面的输入框，选渠道保存。嫌麻烦就跳过，邮件够用。</p>
+        <b>第三步 · 微信提醒（可选，最稳）</b>
+        <p>手机通知会被系统省电策略掐掉，微信不会。想要稳，就在 PushPlus 用微信扫码登录、关注公众号、拿 token 粘到上面，保存后点「发送测试」。</p>
+        <p class="howto-note">邮件不发日常提醒，它只在「找回密码」时用一次。别去邮箱等提醒。</p>
       </div>
     </div>
   
@@ -354,8 +348,8 @@
 <button id="fabAdd" class="fab" type="button" aria-label="新增任务"
         onclick="window.__openAdd && window.__openAdd()">+</button>
 
-<script src="/capture.js?v=35"></script>
-<script src="/quotes.js?v=35"></script>
-<script src="/app.js?v=35"></script>
+<script src="/capture.js?v=36"></script>
+<script src="/quotes.js?v=36"></script>
+<script src="/app.js?v=36"></script>
 </body>
 </html>
